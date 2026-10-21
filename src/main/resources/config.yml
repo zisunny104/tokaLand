@@ -1,0 +1,12 @@
+language: zh-TW
+ownership:
+  # 尚未完成交接前保持 false；不會因為安裝插件就接手 zero。
+  active: false
+storage:
+  backend: SQLITE
+  schema-version: 1
+  directory: storage
+
+display:
+  player-land-topbar: true
+  public-land-topbar: false

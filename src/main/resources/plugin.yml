@@ -1,0 +1,16 @@
+name: tokaLand
+main: dev.toka.land.Main
+version: "0.1.0"
+api: ["1.0.4"]
+load: POSTWORLD
+softdepend: [tokaDisplay, tokaProfiles, tokaWorlds]
+permissions:
+  tokaland.admin:
+    description: 管理領地與協助擁有者編輯；不自動繞過 LOCK
+    default: op
+  tokaland.lock-bypass:
+    description: 允許申請限時 LOCK 繞過，仍須明確啟用及確認稽核紀錄
+    default: op
+  tokaland.inspect:
+    description: 查詢 Land 原生資料與待命狀態
+    default: op
