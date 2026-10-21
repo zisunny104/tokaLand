@@ -66,6 +66,7 @@ public final class Main extends PluginBase implements Listener {
             if(getConfig().getBoolean("ownership.active",false)&&!ownership)getLogger().error("Land 保護及交接尚未完成驗證，或 zero 仍在管理領地；保持待命。");
             connectDisplay();
             getServer().getPluginManager().registerEvents(this, this);
+            getServer().getPluginManager().registerEvents(new dev.toka.land.protection.PlayerProtectionListener(this), this);
             ready = true;
             readCommand=new dev.toka.land.command.LandCommand(this);
             getServer().getCommandMap().register("tokaland",readCommand);

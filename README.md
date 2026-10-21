@@ -19,8 +19,11 @@
 
 資料索引會查出全部命中領地；子領地可橫跨父領地多個選區，但不能超出其聯集或跨越空洞。原生資料讀取會拒絕未知巢狀欄位、溢位／非整數的方塊座標及不支援的格式。保存以不可變內容檔與作用中 manifest 切換，舊內容暫保留，不代表已實作定期清理。唯一拆分進度與交接規劃位於 zero 的 `docs/ARCHITECTURE.md`。
 
-保護查詢 API（限伺服器主執行緒）：`Main.queryProtectionJson(Player, world, x, y, z, action)`。action 為 `INTERACT`／`BUILD`／`CONTAINERS`／`MANAGE`／`CREATE_CHILD`。回傳 JSON 的 status、allowed、reason、claims（全部命中）與 blockingClaims；`UNAVAILABLE`、`INVALID_REQUEST` 均不可視為允許。正式 ownership 尚未啟用，因此目前查詢回傳 `UNAVAILABLE`。本階段沒有註冊遊戲保護事件。
+保護查詢 API（限伺服器主執行緒）：`Main.queryProtectionJson(Player, world, x, y, z, action)`。action 為 `INTERACT`／`BUILD`／`CONTAINERS`／`MANAGE`／`CREATE_CHILD`。回傳 JSON 的 status、allowed、reason、claims（全部命中）與 blockingClaims；`UNAVAILABLE`、`INVALID_REQUEST` 均不可視為允許。正式 ownership 尚未啟用，因此目前查詢回傳 `UNAVAILABLE`。玩家保護 listener 已註冊但僅在正式 ownership 啟用後才執行，目前保持待命。
 
 `tokaland.admin` 預設 OP，可管理／協助編輯一般領地，仍尊重 maintenance lock。PROTECT 的外部授權須透過 `registerProtectedAuthority(providerName, BiPredicate<Player,String>)` 註冊；第二參數是 claim 與 action 的 JSON，provider 必須保留自身規則，不可直接用一般分享權替代舊 qx。provider 缺少、停用、重新載入或拋出錯誤時拒絕外部授權。`unregisterProtectedAuthority(providerName)` 可解除；一次只接受一個 provider。這些是可信任插件介面，providerName 不是驗證憑證。
 
 LOCK 繞過目前仍停用：`requestLockBypassJson(Player, enabled, durationMillis)` 回傳 `LOCK_BYPASS_AUDIT_UNAVAILABLE`（或待命時的 `LAND_NOT_ACTIVE`），不能聲稱已啟用。純 session policy 已測試明確啟用、兩項權限、到期、撤銷與等待稽核確認；尚待接上有界非同步持久稽核及實際使用紀錄，之後才可開放。`tokaland.lock-bypass` 預設 OP 也不會單獨放行。`setMaintenanceLocked(boolean)` 是可信任插件的全域維護鎖介面，開啟時任何玩家查詢均拒絕。
+玩家保護接線目前包含破壞／放置（BUILD）、點擊方塊與踩踏（INTERACT，含原有容器互動）及展示框取物（INTERACT）。查詢以事件的實際目標為準，放置查放置位置、展示框優先查框本體，不查玩家腳下；只新增取消，不解除其他插件已取消的事件。空氣點擊不查核心提供的假 `(0,0,0)` 方塊，修正舊版的誤判。沒有額外加入 InventoryOpen／CONTAINERS 門檻，避免更改舊效果。
+
+盔甲座受玩家傷害亦查實際實體位置（BUILD），依已確認的新規則統一套用全部命中領地與 Area 保護；這是相較舊 Area 沒有對應 handler 的明確行為調整。選取工具、PvP、液體／火／活塞等規則亦不在這批玩家事件範圍內。`PROTECTION_READY` 仍為 false，這批接線不代表可以停用 zero 正式保護。
