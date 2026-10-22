@@ -95,6 +95,23 @@ public final class LandService implements AutoCloseable {
             catch(Exception failure){healthy=false;throw new CompletionException(failure);}
         },writer);
     }
+    /** Points every claim of one world at a new world name in one commit; refuses if the new name already holds claims. Completes with the number renamed. */
+    public CompletableFuture<Integer> renameWorld(String from,String to){
+        if(from==null||to==null||from.isBlank()||to.isBlank()||from.equals(to))throw new IllegalArgumentException("INVALID_WORLD_NAME");
+        return CompletableFuture.supplyAsync(()->{
+            if(!healthy)throw new IllegalStateException("Land storage requires recovery");
+            var current=snapshot.index().all();
+            if(current.stream().anyMatch(c->c.world().equals(to)))throw new ClaimConflict("WORLD_NAME_IN_USE");
+            var all=new ArrayList<LandClaim>();int renamed=0;
+            for(LandClaim claim:current){
+                if(claim.world().equals(from)){all.add(ClaimEdits.inWorld(claim,to));renamed++;}
+                else all.add(claim);
+            }
+            if(renamed==0)return 0;
+            try{snapshot=repository.replace(snapshot.revision(),all);return renamed;}
+            catch(Exception failure){healthy=false;throw new CompletionException(failure);}
+        },writer);
+    }
     /** Removes all given claims in one commit, only if each is unchanged and nothing outside the set still has them as parent. */
     public CompletableFuture<String> deleteAll(List<LandClaim> expected){
         List<LandClaim> targets=List.copyOf(expected);

@@ -70,4 +70,29 @@ public class LandServiceTest {
             try { lands.deleteAll(List.of(a)).get(); fail(); } catch (ExecutionException error) { assertEquals("CLAIM_CHANGED", reason(error)); }
         }
     }
+
+    @Test public void renameWorldMovesClaimsAndTeleportTogether() throws Exception {
+        try (var store = DocumentStore.open(new StoreConfig(Backend.JSON, temporary.newFolder().toPath(), 1));
+             var lands = new LandService(new DatasetRepository(store))) {
+            var home = claim("home", ClaimKind.PLAYER, null, 0, 4);
+            var withTeleport = new LandClaim(home.id(), "home", home.kind(), home.type(), home.ownerId(), null, false, true, home.selections(),
+                    List.of(), AccessPolicy.privateDefault(), Map.of(), null, null,
+                    new ClaimDetails(null, null, new ClaimDetails.TeleportPoint("w", 1, 2, 1, 0, 0), false));
+            lands.create(withTeleport).get();
+            assertEquals(1, (int) lands.renameWorld("w", "w2").get());
+            var after = lands.snapshot().index().get(home.id()).orElseThrow();
+            assertEquals("w2", after.world());
+            assertEquals("w2", after.details().teleport().world());
+            assertEquals(withTeleport.selections().get(0).id(), after.selections().get(0).id());
+            assertEquals(0, (int) lands.renameWorld("w", "w3").get());
+        }
+    }
+
+    @Test public void renameWorldRefusesANameThatAlreadyHoldsClaims() throws Exception {
+        try (var store = DocumentStore.open(new StoreConfig(Backend.JSON, temporary.newFolder().toPath(), 1));
+             var lands = new LandService(new DatasetRepository(store))) {
+            lands.create(claim("a", ClaimKind.PLAYER, null, 0, 4)).get();
+            try { lands.renameWorld("other", "w").get(); fail(); } catch (ExecutionException error) { assertEquals("WORLD_NAME_IN_USE", reason(error)); }
+        }
+    }
 }

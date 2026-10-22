@@ -219,6 +219,14 @@ public final class Main extends PluginBase {
         main.getLogger().info("Land maintenance lock=" + locked);
     }
 
+    /** Called by tokaWorlds after renaming a world; claims and teleport points follow. Completes with the number of claims changed. */
+    public static CompletableFuture<Integer> renameWorld(String from, String to) {
+        Main main = instance;
+        if (main == null || !main.isReady()) throw new IllegalStateException("Land unavailable");
+        main.requirePrimaryThread();
+        return main.dataset.renameWorld(from, to);
+    }
+
     public static String exportDatasetJson() {
         Main main = instance;
         if (main == null || !main.isReady()) throw new IllegalStateException("Land unavailable");

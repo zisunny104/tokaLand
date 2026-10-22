@@ -30,6 +30,12 @@ final class DatasetAPI {
         return out.toString();
     }
 
+    /** For tokaWorlds after a world was renamed; refused while a transaction is unfinished, since it still names the old world. */
+    CompletableFuture<Integer> renameWorld(String from, String to) {
+        if (trading.hasPending()) throw new IllegalStateException("Unfinished land transactions must be recovered before renaming a world");
+        return lands.renameWorld(from, to);
+    }
+
     /** Refused while Land owns protection or any transaction is unfinished. */
     CompletableFuture<String> replace(String expectedRevision, String json) {
         if (Main.ownsLand()) throw new IllegalStateException("Bulk replacement requires inactive ownership");

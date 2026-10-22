@@ -43,4 +43,13 @@ public final class ClaimEdits {
         return new LandClaim(c.id(),c.name(),c.kind(),c.type(),c.ownerId(),c.parentClaimId(),c.inheritOwner(),c.inheritPermissions(),
                 List.of(part),c.accessGrants(),c.accessPolicy(),c.localizedNames(),c.legacyOwnerName(),c.ownerNameSnapshot(),c.details());
     }
+    /** Same claim in another world: selection IDs are kept and the teleport point moves with it. */
+    public static LandClaim inWorld(LandClaim c,String world){
+        List<LandSelection> parts=c.selections().stream().map(p->new LandSelection(p.id(),world,p.minX(),p.minY(),p.minZ(),p.maxX(),p.maxY(),p.maxZ(),p.ignoreHeight())).toList();
+        var tp=c.details().teleport();
+        var details=tp==null?c.details():new ClaimDetails(c.details().creatorId(),c.details().creatorName(),
+                new ClaimDetails.TeleportPoint(world,tp.x(),tp.y(),tp.z(),tp.yaw(),tp.pitch()),c.details().publicTeleport());
+        return new LandClaim(c.id(),c.name(),c.kind(),c.type(),c.ownerId(),c.parentClaimId(),c.inheritOwner(),c.inheritPermissions(),
+                parts,c.accessGrants(),c.accessPolicy(),c.localizedNames(),c.legacyOwnerName(),c.ownerNameSnapshot(),details);
+    }
 }
