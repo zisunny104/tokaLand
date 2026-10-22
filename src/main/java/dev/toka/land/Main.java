@@ -227,6 +227,14 @@ public final class Main extends PluginBase {
         return main.dataset.renameWorld(from, to);
     }
 
+    /** Number of claims in a world, so tokaWorlds can report what a rename will change. */
+    public static int countClaimsInWorld(String world) {
+        Main main = instance;
+        if (main == null || !main.isReady()) throw new IllegalStateException("Land unavailable");
+        main.requirePrimaryThread();
+        return (int) main.index().all().stream().filter(claim -> claim.world().equals(world)).count();
+    }
+
     public static String exportDatasetJson() {
         Main main = instance;
         if (main == null || !main.isReady()) throw new IllegalStateException("Land unavailable");
