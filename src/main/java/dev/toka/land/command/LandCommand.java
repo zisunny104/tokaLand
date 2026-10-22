@@ -48,6 +48,10 @@ public final class LandCommand extends Command {
         addCommandParameters("menu",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandMenuAction",new String[]{"menu","gui"}))});
         addCommandParameters("localInfo",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandLocalInfoAction",new String[]{"info"}))});
         addCommandParameters("ownerList",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandOwnerListAction",new String[]{"list"})),CommandParameter.newType("player",true,CommandParamType.TARGET)});
+        addCommandParameters("grant",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandGrantAction",new String[]{"grant"})),
+            CommandParameter.newType("player",CommandParamType.TARGET),CommandParameter.newType("name",CommandParamType.STRING)});
+        addCommandParameters("refund",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandRefundAction",new String[]{"refund"})),
+            CommandParameter.newType("amount",CommandParamType.INT),CommandParameter.newType("claim",true,CommandParamType.STRING)});
         addCommandParameters("reset",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandResetAction",new String[]{"reset"})),CommandParameter.newType("claim",true,CommandParamType.STRING)});
         addCommandParameters("clear",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandClearAction",new String[]{"clear"})),CommandParameter.newEnum("step",true,new CommandEnum("TokaLandClearStep",new String[]{"confirm"}))});
         addCommandParameters("info",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandInfoAction",new String[]{"info"})),CommandParameter.newType("claimId",CommandParamType.STRING)});
@@ -55,15 +59,7 @@ public final class LandCommand extends Command {
     @Override public boolean execute(CommandSender sender,String label,String[] args) {
         if(!testPermissionSilent(sender)){send(sender,"command.denied");return true;}
         String action=args.length==0?"help":args[0].toLowerCase(Locale.ROOT);
-        if(action.equals("help")&&args.length<=1){
-            if(sender.hasPermission("tokaland.inspect"))for(String key:List.of("command.helpStatus","command.helpList","command.helpInfo"))send(sender,key);
-            if(sender.hasPermission("tokaland.use"))for(String key:List.of("purchase.helpSet","purchase.helpTpl","purchase.helpSelect"))send(sender,key);
-            if(sender.hasPermission("tokaland.use"))for(String key:List.of("tools.helpInfo","tools.helpList","window.help"))send(sender,key);
-            if(sender.hasPermission("tokaland.admin"))for(String key:List.of("tools.helpReset","tools.helpClear","facility.helpManage"))send(sender,key);
-            if(sender.hasPermission("tokaland.admin"))send(sender,"facility.help");
-            if(sender.hasPermission("tokaland.use"))for(String key:List.of("management.helpRename","management.helpGive","management.helpType","management.helpGroup","management.helpDel"))send(sender,key);
-            return true;
-        }
+        if(action.equals("help")&&args.length<=1){showHelp(sender);return true;}
         if(!plugin.isReady()){send(sender,"ui.unavailable","Land");return true;}
         if(Set.of("rename","give","type","group","grp","del").contains(action)
                 ||action.equals("tpl")&&sender instanceof Player p&&(args.length>1||!plugin.management().claimsAround(p).isEmpty()))return manage(sender,action,args);
@@ -75,7 +71,7 @@ public final class LandCommand extends Command {
             if(action.equals("info")&&args.length==1)return tools.localInfo(self);
             if(action.equals("list")&&args.length==2&&!args[1].chars().allMatch(Character::isDigit))return tools.ownerList(sender,args[1]);
             if(action.equals("list")&&args.length==1&&!sender.hasPermission("tokaland.inspect"))return tools.ownerList(sender,self.getName());
-            if(action.equals("reset")||action.equals("clear"))return adminTool(self,action,args);
+            if(Set.of("reset","clear","grant","refund").contains(action))return adminTool(self,action,args);
         }
         if(action.equals("status")&&args.length==1){send(sender,"command.status",Main.ownsLand()?"ACTIVE":"STANDBY",plugin.allClaims().size());return true;}
         if(action.equals("list")&&args.length<=2){
@@ -135,12 +131,45 @@ public final class LandCommand extends Command {
         }catch(RuntimeException failure){send(sender,"purchase.unavailable",failure.getMessage());return true;}
         send(sender,"command.usage");return true;
     }
+    /** Help in three sections; each line shows only what the sender may use. */
+    private void showHelp(CommandSender sender){
+        send(sender,"help.title");
+        if(sender.hasPermission("tokaland.use")){
+            send(sender,"help.secRead");for(String key:List.of("menu","info","list"))send(sender,"help."+key);
+            send(sender,"help.secManage");for(String key:List.of("select","tpl","set","rename","give","type","group","del","note"))send(sender,"help."+key);
+        }
+        if(sender.hasPermission("tokaland.admin")){
+            send(sender,"help.secAdmin");for(String key:List.of("grant","refund","reset","clear","fac","facHelp"))send(sender,"help."+key);
+        }
+        if(sender.hasPermission("tokaland.inspect"))for(String key:List.of("status","adminList","adminInfo"))send(sender,"help."+key);
+    }
+    private void facilityHelp(CommandSender sender){
+        send(sender,"help.facTitle");
+        for(String key:List.of("create","list","del","type","mode","lock"))send(sender,"fachelp."+key);
+    }
     private boolean adminTool(Player player,String action,String[] args){
         if(!player.hasPermission("tokaland.admin")){send(player,"command.denied");return true;}
         try{
             if(action.equals("clear")){
                 if(args.length>2||args.length==2&&!args[1].equalsIgnoreCase("confirm")){send(player,"command.usage");return true;}
                 return tools.clear(player,args.length==2);
+            }
+            if(action.equals("grant")){
+                if(args.length!=3){send(player,"command.usage");return true;}
+                UUID owner=plugin.management().resolvePlayer(args[1]);
+                plugin.management().grant(player,owner,args[2]).whenComplete((name,error)->plugin.getServer().getScheduler().scheduleTask(plugin,()->{
+                    if(error!=null)send(player,"purchase.unavailable",rootMessage(error));else send(player,"grant.done",args[1],name);
+                }));
+                return true;
+            }
+            if(action.equals("refund")){
+                if(args.length<2||args.length>3){send(player,"command.usage");return true;}
+                long amount=Long.parseLong(args[1]);
+                var claim=ClaimTargets.resolve(plugin.management().claimsAround(player),args.length==3?args[2]:null);
+                plugin.management().setRefund(player,claim,amount).whenComplete((revision,error)->plugin.getServer().getScheduler().scheduleTask(plugin,()->{
+                    if(error!=null)send(player,"purchase.unavailable",rootMessage(error));else send(player,"refund.done",claim.name(),amount);
+                }));
+                return true;
             }
             if(args.length>2){send(player,"command.usage");return true;}
             var target=ClaimTargets.resolve(plugin.management().claimsAround(player),args.length==2?args[1]:null);
@@ -187,11 +216,16 @@ public final class LandCommand extends Command {
                     if(args.length==4&&!on&&!args[3].equalsIgnoreCase("off")){send(player,"command.usage");return true;}
                     facilities.lock(player,args[2],on).whenComplete((r,e)->done(player,e,on?"facility.locked":"facility.unlocked",args[2]));
                 }
+                case "help" -> facilityHelp(player);
                 default -> send(player,"command.usage");
             }
         }catch(NumberFormatException invalid){send(player,"command.invalidPage");}
         catch(IllegalArgumentException|IllegalStateException failure){send(player,"purchase.unavailable",failure.getMessage());}
         return true;
+    }
+    private static String rootMessage(Throwable error){
+        Throwable root=error;while(root instanceof java.util.concurrent.CompletionException&&root.getCause()!=null)root=root.getCause();
+        return root.getMessage()==null?root.getClass().getSimpleName():root.getMessage();
     }
     private void done(Player player,Throwable error,String key,Object...args){
         plugin.getServer().getScheduler().scheduleTask(plugin,()->{

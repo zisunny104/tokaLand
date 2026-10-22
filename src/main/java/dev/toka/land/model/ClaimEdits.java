@@ -59,4 +59,8 @@ public final class ClaimEdits {
         return new LandClaim(c.id(),c.name(),c.kind(),c.type(),c.ownerId(),c.parentClaimId(),c.inheritOwner(),c.inheritPermissions(),
                 c.selections(),c.accessGrants(),policy,c.localizedNames(),c.legacyOwnerName(),c.ownerNameSnapshot(),c.details());
     }
+    /** Sets what deleting the claim pays back; 0 means nothing. */
+    public static LandClaim refund(LandClaim c,long value){
+        return copy(c,c.name(),c.type(),c.ownerId(),c.ownerNameSnapshot(),c.accessGrants(),c.details().withRefundValue(value));
+    }
 }

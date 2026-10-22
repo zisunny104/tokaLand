@@ -15,6 +15,9 @@ public record ClaimDetails(UUID creatorId, String creatorName, TeleportPoint tel
     public ClaimDetails {
         if (refundValue != null && refundValue < 0) throw new IllegalArgumentException("refundValue must not be negative");
     }
+    public ClaimDetails withRefundValue(long value) {
+        return new ClaimDetails(creatorId, creatorName, teleport, publicTeleport, value, refundSource);
+    }
     public ClaimDetails withTeleport(TeleportPoint point) {
         return new ClaimDetails(creatorId, creatorName, point, publicTeleport, refundValue, refundSource);
     }

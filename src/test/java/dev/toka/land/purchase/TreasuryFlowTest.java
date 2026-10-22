@@ -111,4 +111,14 @@ public class TreasuryFlowTest {
     @Test(expected = IllegalArgumentException.class) public void aNegativeRefundValueIsRejected() {
         new ClaimDetails(null, null, null, false, -1L, null);
     }
+
+    @Test public void settingTheRefundKeepsEverythingElseAndZeroMeansNothing() {
+        UUID treasury = UUID.randomUUID();
+        var claim = claim(0, new ClaimDetails(UUID.randomUUID(), "Owner", null, true, 33L, treasury));
+        var none = ClaimEdits.refund(claim, 0);
+        assertEquals(0L, (long) none.details().refundValue());
+        assertEquals(treasury, none.details().refundSource());
+        assertEquals(claim.id(), none.id());
+        assertEquals(claim.selections(), none.selections());
+    }
 }

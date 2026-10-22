@@ -5,7 +5,10 @@ import dev.toka.land.model.ClaimAccess;
 import dev.toka.land.model.ClaimKind;
 import dev.toka.land.model.ClaimPermission;
 import dev.toka.land.model.LandClaim;
+import dev.toka.land.model.AccessPolicy;
+import dev.toka.land.model.ClaimDetails;
 import dev.toka.land.model.ClaimEdits;
+import dev.toka.land.model.ReservedNames;
 import dev.toka.land.model.LandSelection;
 import java.util.HashMap;
 import java.util.List;
@@ -56,6 +59,32 @@ public final class Management implements cn.nukkit.event.Listener {
 
     @cn.nukkit.event.EventHandler public void onQuit(cn.nukkit.event.player.PlayerQuitEvent event) {
         clearPreviews.remove(event.getPlayer().getUniqueId());
+    }
+
+    /**
+     * Administrators only: creates a claim for the player from the current selection. No payment is taken and the refund
+     * value is 0, so a claim handed out this way can never be turned into income. The administrator is recorded as creator.
+     */
+    public CompletableFuture<String> grant(Player admin, UUID owner, String name) {
+        requireAdmin(admin);
+        if (ReservedNames.is(name)) throw new IllegalArgumentException("RESERVED_NAME");
+        var tool = plugin.selectionTool();
+        var draft = tool == null ? null : tool.get(admin.getUniqueId());
+        if (draft == null) throw new IllegalStateException("SELECTION_REQUIRED");
+        var part = draft.geometry();
+        var claim = new LandClaim(UUID.randomUUID(), name, ClaimKind.PLAYER, "land", owner, null, false, false, List.of(part), List.of(),
+                AccessPolicy.privateDefault(), Map.of(), null, playerName(owner),
+                new ClaimDetails(admin.getUniqueId(), admin.getName(), draft.teleport(), true, 0L, null));
+        return lands.create(claim).thenApply(revision -> { tool.forget(admin.getUniqueId()); return name; });
+    }
+
+    /** Administrators only: changes what deleting the claim pays back. */
+    public CompletableFuture<String> setRefund(Player admin, LandClaim claim, long value) {
+        requireAdmin(admin);
+        if (value < 0) throw new IllegalArgumentException("INVALID_AMOUNT");
+        if (claim.kind() != ClaimKind.PLAYER) throw new IllegalStateException("CLAIM_NOT_PLAYER");
+        if (trading.hasPending(claim.id())) throw new IllegalStateException("TRANSACTION_RECOVERY_PENDING");
+        return lands.edit(claim, ClaimEdits.refund(claim, value));
     }
 
     private LandSelection draft(Player player) {
