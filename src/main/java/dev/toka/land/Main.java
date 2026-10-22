@@ -72,6 +72,11 @@ public final class Main extends PluginBase implements Listener {
             connectDisplay();
             getServer().getPluginManager().registerEvents(this, this);
             getServer().getPluginManager().registerEvents(new dev.toka.land.protection.PlayerProtectionListener(this), this);
+            var explosionListener=new dev.toka.land.protection.ExplosionProtectionListener(
+                Main::ownsLand,this::cancelEntityExplosion,()->getServer().getTick(),
+                line->getLogger().warning(line));
+            getServer().getPluginManager().registerEvents(explosionListener,this);
+            getServer().getScheduler().scheduleRepeatingTask(this,explosionListener::prune,20);
             ready = true;
             readCommand=new dev.toka.land.command.LandCommand(this);
             getServer().getCommandMap().register("tokaland",readCommand);
@@ -101,6 +106,32 @@ public final class Main extends PluginBase implements Listener {
     public static Main instance() { return instance; }
     public boolean isReady() { return ready&&lands!=null&&lands.healthy(); }
     public static boolean ownsLand(){return instance!=null&&instance.isReady()&&instance.ownership;}
+    private boolean cancelEntityExplosion(cn.nukkit.entity.Entity source,Position center,double force){
+        if(explosionRules==null||center==null||center.getLevel()==null||!Double.isFinite(force)||force<0)return true;
+        double radius=force*2d;
+        var bounds=new dev.toka.land.protection.ExplosionRules.Bounds(center.getLevel().getFolderName(),
+            Math.floor(center.x-radius-1d),Math.floor(center.y-radius-1d),Math.floor(center.z-radius-1d),
+            Math.ceil(center.x+radius+1d),Math.ceil(center.y+radius+1d),Math.ceil(center.z+radius+1d));
+        var index=lands.snapshot().index();
+        var attribution=dev.toka.land.protection.ExplosionAttribution.resolve(source,explosionRules.attributionMaxDepth());
+        java.util.function.Predicate<LandClaim> permitted=claim->{
+            if(maintenanceLocked)return false;
+            var player=attribution.playerId()==null?null:getServer().getOnlinePlayers().values().stream()
+                .filter(candidate->candidate.getUniqueId().equals(attribution.playerId())).findFirst().orElse(null);
+            boolean administrator=player!=null&&player.hasPermission("tokaland.admin");
+            return switch(claim.details().protection()){
+                case OPEN -> true;
+                case PRIVATE -> administrator||dev.toka.land.model.ClaimAccess.allows(index,claim.id(),attribution.playerId(),ClaimPermission.BUILD,false);
+                case PROTECT -> administrator||player!=null&&externalAuthority(player,claim,ClaimPermission.BUILD);
+                // LOCK remains closed until its durable enable and audit path exists.
+                case LOCK -> false;
+            };
+        };
+        var decision=explosionRules.evaluate(index,bounds,attribution,permitted);
+        boolean cancel=maintenanceLocked&&!decision.affectedClaims().isEmpty()||decision.cancel();
+        if(cancel)getLogger().info("已攔截領地範圍內爆炸："+decision.reason()+"，命中領地="+decision.affectedClaims().size());
+        return cancel;
+    }
     /** Main-thread API. UNAVAILABLE must never be interpreted as permission to edit. */
     public static String queryProtectionJson(Player player,String world,int x,int y,int z,String action){
         Main main=instance;

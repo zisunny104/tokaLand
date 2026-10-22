@@ -33,7 +33,18 @@ public record ExplosionRules(Mode mode,boolean environmentProtection,int attribu
         if(mode==Mode.DISABLED)return new Decision(false,"DISABLED",List.of(),List.of());
         List<LandClaim> hits=index.all().stream().filter(c->c.selections().stream().anyMatch(bounds::intersects))
             .sorted(Comparator.comparing(c->c.id().toString())).toList();
-        List<UUID> denied=hits.stream().filter(c->actor.confirmed()?!playerAuthorized.test(c):environmentProtection).map(LandClaim::id).toList();
+        // A child hit replaces the private protection of its ancestors for this operation.
+        // Other overlapping claims still participate independently.
+        Set<UUID> overriddenAncestors=new HashSet<>();
+        for(LandClaim hit:hits){LandClaim current=hit;Set<UUID> visited=new HashSet<>();
+            while(current.parentClaimId()!=null&&visited.add(current.id())){
+                overriddenAncestors.add(current.parentClaimId());
+                current=index.get(current.parentClaimId()).orElseThrow();
+            }
+        }
+        List<LandClaim> effectiveHits=hits.stream().filter(c->!(overriddenAncestors.contains(c.id())
+            &&c.details().protection()==ClaimDetails.ProtectionMode.PRIVATE)).toList();
+        List<UUID> denied=effectiveHits.stream().filter(c->actor.confirmed()?!playerAuthorized.test(c):environmentProtection).map(LandClaim::id).toList();
         return new Decision(!denied.isEmpty(),denied.isEmpty()?"ALLOW":actor.confirmed()?"PLAYER_DENIED":"ENVIRONMENT_PROTECTED",hits.stream().map(LandClaim::id).toList(),denied);
     }
 }
