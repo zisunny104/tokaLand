@@ -3,6 +3,7 @@ package dev.toka.land;
 import cn.nukkit.Player;
 import cn.nukkit.plugin.PluginBase;
 import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
 import dev.toka.land.command.LandCommand;
 import dev.toka.land.form.LandWindow;
 import dev.toka.land.model.LandClaim;
@@ -239,6 +240,24 @@ public final class Main extends PluginBase {
         if (main == null || !main.isReady()) throw new IllegalStateException("Land unavailable");
         main.requirePrimaryThread();
         return (int) main.index().all().stream().filter(claim -> claim.world().equals(world)).count();
+    }
+
+    /**
+     * The claims at a point as a JSON array of {id, kind, type}; "[]" when none or Land is not ready. Safe from any thread
+     * (it reads an immutable snapshot). Used by tokaProtect to tell claimed land from unclaimed land.
+     */
+    public static String claimsAtJson(String world, int x, int y, int z) {
+        Main main = instance;
+        if (main == null || !main.isReady()) return "[]";
+        JsonArray rows = new JsonArray();
+        for (var claim : main.index().findAllAt(world, x, y, z)) {
+            JsonObject row = new JsonObject();
+            row.addProperty("id", claim.id().toString());
+            row.addProperty("kind", claim.kind().name());
+            row.addProperty("type", claim.type());
+            rows.add(row);
+        }
+        return rows.toString();
     }
 
     public static String exportDatasetJson() {
