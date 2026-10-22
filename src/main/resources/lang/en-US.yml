@@ -18,6 +18,7 @@ management:
   helpType: "§e/land type <land|pvp> [claimId|name] §7— Set the existing land type"
   helpGroup: "§e/land group <add|del> <player|UUID> [claimId|name]; /land group list [claimId|name] §7— Manage shared access; alias grp"
   helpDel: "§e/land del [claimId|name] §7— Delete the current claim; its creator receives the legacy refund; specify ambiguous targets"
+  treasuryShort: "§e[Land] The treasury cannot cover the refund. To delete anyway without a refund, add norefund at the end of the command."
   saleStarted: "§b[Land] Saving deletion and refund transaction. Please wait."
   saleResult: "§b[Land] Deletion/refund: ${0}; ID: ${1}; ${2}"
   ambiguous: "§e[Land] Multiple claims matched. Specify an ID or unique name at the end of the command:"

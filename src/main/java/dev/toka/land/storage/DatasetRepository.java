@@ -166,7 +166,10 @@ public final class DatasetRepository {
         if(!value.isJsonPrimitive())throw new IllegalArgumentException("Expected scalar: "+path);
         JsonPrimitive scalar=value.getAsJsonPrimitive();
         if(c==boolean.class){if(!scalar.isBoolean())throw new IllegalArgumentException("Expected boolean: "+path);}
-        else if(c==int.class){
+        else if(c==long.class||c==Long.class){
+            if(!scalar.isNumber())throw new IllegalArgumentException("Expected integer: "+path);
+            try{scalar.getAsBigDecimal().longValueExact();}catch(ArithmeticException e){throw new IllegalArgumentException("Invalid integer: "+path,e);}
+        }else if(c==int.class){
             if(!scalar.isNumber())throw new IllegalArgumentException("Expected integer: "+path);
             try{scalar.getAsBigDecimal().intValueExact();}catch(ArithmeticException e){throw new IllegalArgumentException("Invalid integer: "+path,e);}
         }else if(c==double.class||c==float.class){

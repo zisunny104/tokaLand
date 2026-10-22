@@ -23,7 +23,7 @@ public final class ClaimEdits {
         return copy(c,c.name(),type,c.ownerId(),c.ownerNameSnapshot(),c.accessGrants(),c.details());
     }
     public static LandClaim teleport(LandClaim c,ClaimDetails.TeleportPoint point){
-        return copy(c,c.name(),c.type(),c.ownerId(),c.ownerNameSnapshot(),c.accessGrants(),new ClaimDetails(c.details().creatorId(),c.details().creatorName(),point,c.details().publicTeleport()));
+        return copy(c,c.name(),c.type(),c.ownerId(),c.ownerNameSnapshot(),c.accessGrants(),c.details().withTeleport(point));
     }
     public static LandClaim member(LandClaim c,AccessSubject subject,boolean add){
         if(add&&subject.type()!=AccessSubject.Type.PLAYER_UUID)throw new IllegalArgumentException("MEMBER_IDENTITY_UNCONFIRMED");
@@ -47,8 +47,7 @@ public final class ClaimEdits {
     public static LandClaim inWorld(LandClaim c,String world){
         List<LandSelection> parts=c.selections().stream().map(p->new LandSelection(p.id(),world,p.minX(),p.minY(),p.minZ(),p.maxX(),p.maxY(),p.maxZ(),p.ignoreHeight())).toList();
         var tp=c.details().teleport();
-        var details=tp==null?c.details():new ClaimDetails(c.details().creatorId(),c.details().creatorName(),
-                new ClaimDetails.TeleportPoint(world,tp.x(),tp.y(),tp.z(),tp.yaw(),tp.pitch()),c.details().publicTeleport());
+        var details=tp==null?c.details():c.details().withTeleport(new ClaimDetails.TeleportPoint(world,tp.x(),tp.y(),tp.z(),tp.yaw(),tp.pitch()));
         return new LandClaim(c.id(),c.name(),c.kind(),c.type(),c.ownerId(),c.parentClaimId(),c.inheritOwner(),c.inheritPermissions(),
                 parts,c.accessGrants(),c.accessPolicy(),c.localizedNames(),c.legacyOwnerName(),c.ownerNameSnapshot(),details);
     }

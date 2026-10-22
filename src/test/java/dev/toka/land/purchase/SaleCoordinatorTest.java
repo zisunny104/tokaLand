@@ -19,9 +19,9 @@ public class SaleCoordinatorTest {
     }
     private static final class Ledger implements PurchaseCoordinator.Ledger {
         final Set<String> receipts=new HashSet<>();long credited;boolean loseReply;
-        public CompletableFuture<String> debit(UUID player,String currency,long amount,String op){throw new AssertionError("A sale must not debit");}
-        public CompletableFuture<String> refund(UUID player,String op){throw new AssertionError("Sale refund is not failed-purchase compensation");}
-        public CompletableFuture<String> credit(UUID player,String currency,long amount,String op){
+        public CompletableFuture<String> debit(UUID player,UUID beneficiary,String currency,long amount,String op){throw new AssertionError("A sale must not debit");}
+        public CompletableFuture<String> refund(UUID player,UUID beneficiary,String currency,long amount,String op){throw new AssertionError("Sale refund is not failed-purchase compensation");}
+        public CompletableFuture<String> credit(UUID player,UUID source,String currency,long amount,String op){
             assertTrue(op.startsWith("sale:"));if(receipts.add(op))credited+=amount;
             if(loseReply){loseReply=false;return CompletableFuture.failedFuture(new IOException("lost credit acknowledgement"));}
             return CompletableFuture.completedFuture("OK");
@@ -31,17 +31,17 @@ public class SaleCoordinatorTest {
         for(Backend backend:Backend.values())try(var store=DocumentStore.open(new StoreConfig(backend,temporary.newFolder().toPath(),1));var lands=new LandService(new DatasetRepository(store))){
             var c=claim();lands.create(c).get();var ledger=new Ledger();
             try(var sales=new SaleCoordinator(lands,store,()->ledger)){
-                assertEquals("COMPLETED",sales.sell(c,c.ownerId(),"money",70).get().status());
-                assertEquals("COMPLETED",sales.sell(c,c.ownerId(),"money",70).get().status());
+                assertEquals("COMPLETED",sales.sell(c,c.ownerId(),"money",70,null).get().status());
+                assertEquals("COMPLETED",sales.sell(c,c.ownerId(),"money",70,null).get().status());
                 assertEquals(70,ledger.credited);assertEquals(1,ledger.receipts.size());assertTrue(lands.snapshot().index().all().isEmpty());
-                assertEquals("CONFLICT",sales.sell(c,c.ownerId(),"money",71).get().status());assertEquals(70,ledger.credited);
+                assertEquals("CONFLICT",sales.sell(c,c.ownerId(),"money",71,null).get().status());assertEquals(70,ledger.credited);
             }
         }
     }
     @Test public void lostRefundReplyIsRecoveredAfterRestartWithoutCreditingTwice()throws Exception{
         var folder=temporary.newFolder().toPath();var c=claim();var ledger=new Ledger();ledger.loseReply=true;
         try(var store=DocumentStore.open(new StoreConfig(Backend.JSON,folder,1));var lands=new LandService(new DatasetRepository(store));var sales=new SaleCoordinator(lands,store,()->ledger)){
-            lands.create(c).get();assertEquals("PENDING",sales.sell(c,c.ownerId(),"money",99).get().status());
+            lands.create(c).get();assertEquals("PENDING",sales.sell(c,c.ownerId(),"money",99,null).get().status());
             assertTrue(sales.hasPending(c.id()));assertTrue(lands.snapshot().index().all().isEmpty());assertEquals(99,ledger.credited);
             assertEquals(c,DatasetRepository.decode(store.load("sale."+c.id()).orElseThrow().getAsJsonObject("claim")));
         }
@@ -52,7 +52,7 @@ public class SaleCoordinatorTest {
     }
     @Test public void missingEconomyReservesSaleWithoutDeletingLand()throws Exception{
         try(var store=DocumentStore.open(new StoreConfig(Backend.JSON,temporary.newFolder().toPath(),1));var lands=new LandService(new DatasetRepository(store));var sales=new SaleCoordinator(lands,store,()->null)){
-            var c=claim();lands.create(c).get();assertEquals("PENDING",sales.sell(c,c.ownerId(),"money",40).get().status());
+            var c=claim();lands.create(c).get();assertEquals("PENDING",sales.sell(c,c.ownerId(),"money",40,null).get().status());
             assertTrue(lands.snapshot().index().get(c.id()).isPresent());assertTrue(sales.hasPending(c.id()));
         }
     }
@@ -62,14 +62,14 @@ public class SaleCoordinatorTest {
                 List.of(new LandSelection("world",1,1,1,2,2,2,false)),List.of(),AccessPolicy.privateDefault(),Map.of(),null,null,ClaimDetails.privateDefaults());
             lands.replace(lands.snapshot().revision(),List.of(parent,child)).get();var ledger=new Ledger();
             try(var sales=new SaleCoordinator(lands,store,()->ledger)){
-                var result=sales.sell(parent,parent.ownerId(),"money",30).get();assertEquals("REJECTED",result.status());assertEquals("CHILD_CLAIMS_EXIST",result.detail());
+                var result=sales.sell(parent,parent.ownerId(),"money",30,null).get();assertEquals("REJECTED",result.status());assertEquals("CHILD_CLAIMS_EXIST",result.detail());
                 assertEquals(2,lands.snapshot().index().all().size());assertEquals(0,ledger.credited);assertTrue(lands.healthy());
             }
         }
     }
     @Test public void zeroRefundDeletesWithoutCallingMoneyApis()throws Exception{
         try(var store=DocumentStore.open(new StoreConfig(Backend.JSON,temporary.newFolder().toPath(),1));var lands=new LandService(new DatasetRepository(store));var sales=new SaleCoordinator(lands,store,()->null)){
-            var c=claim();lands.create(c).get();assertEquals("COMPLETED",sales.sell(c,c.ownerId(),"money",0).get().status());assertTrue(lands.snapshot().index().all().isEmpty());
+            var c=claim();lands.create(c).get();assertEquals("COMPLETED",sales.sell(c,c.ownerId(),"money",0,null).get().status());assertTrue(lands.snapshot().index().all().isEmpty());
         }
     }
 }

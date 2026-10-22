@@ -3,7 +3,24 @@ package dev.toka.land.model;
 import java.util.*;
 
 /** Native Land data; legacy extraction and identity resolution are performed by the caller. */
-public record ClaimDetails(UUID creatorId, String creatorName, TeleportPoint teleport, boolean publicTeleport) {
+/**
+ * @param refundValue what deleting the claim pays back, fixed when it was bought (null: a claim from before this existed)
+ * @param refundSource the account that paid for it and pays the refund; null when nothing holds the money
+ */
+public record ClaimDetails(UUID creatorId, String creatorName, TeleportPoint teleport, boolean publicTeleport,
+                           Long refundValue, UUID refundSource) {
+    public ClaimDetails(UUID creatorId, String creatorName, TeleportPoint teleport, boolean publicTeleport) {
+        this(creatorId, creatorName, teleport, publicTeleport, null, null);
+    }
+    public ClaimDetails {
+        if (refundValue != null && refundValue < 0) throw new IllegalArgumentException("refundValue must not be negative");
+    }
+    public ClaimDetails withTeleport(TeleportPoint point) {
+        return new ClaimDetails(creatorId, creatorName, point, publicTeleport, refundValue, refundSource);
+    }
+    public ClaimDetails withRefund(Long value, UUID source) {
+        return new ClaimDetails(creatorId, creatorName, teleport, publicTeleport, value, source);
+    }
     public record TeleportPoint(String world, double x, double y, double z, float yaw, float pitch) {
         public TeleportPoint {
             if(world==null||world.isBlank()||!Double.isFinite(x)||!Double.isFinite(y)||!Double.isFinite(z)

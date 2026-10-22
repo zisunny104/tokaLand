@@ -13,14 +13,19 @@ import java.util.function.Supplier;
 /** Durable purchase intent precedes payment. Unknown outcomes always retain the original operation ID. */
 public final class PurchaseCoordinator implements AutoCloseable {
     public interface Ledger {
-        CompletableFuture<String> debit(UUID player,String currency,long amount,String operation);
-        CompletableFuture<String> refund(UUID player,String operation);
-        default CompletableFuture<String> credit(UUID player,String currency,long amount,String operation){return CompletableFuture.failedFuture(new UnsupportedOperationException("Credit API unavailable"));}
+        /** Takes the price from the buyer; {@code beneficiary} receives it, or null when nothing holds the money. */
+        CompletableFuture<String> debit(UUID player,UUID beneficiary,String currency,long amount,String operation);
+        /** Gives back exactly what {@link #debit} took, from the beneficiary when there was one. */
+        CompletableFuture<String> refund(UUID player,UUID beneficiary,String currency,long amount,String operation);
+        /** Pays {@code player}; {@code source} pays it, or null when the money is created. */
+        default CompletableFuture<String> credit(UUID player,UUID source,String currency,long amount,String operation){return CompletableFuture.failedFuture(new UnsupportedOperationException("Credit API unavailable"));}
+        /** Whether the account holds the amount: OK, INSUFFICIENT_FUNDS or another status. */
+        default String covers(UUID account,String currency,long amount){return "OK";}
     }
     public record Outcome(String status,UUID operation,String detail){}
     private enum State { PREPARED, PAID, REFUND_PENDING, COMPLETED, REFUNDED, REJECTED }
-    private record Entry(LandClaim claim,String currency,long amount,State state){
-        Entry with(State next){return new Entry(claim,currency,amount,next);}
+    private record Entry(LandClaim claim,String currency,long amount,UUID beneficiary,State state){
+        Entry with(State next){return new Entry(claim,currency,amount,beneficiary,next);}
         boolean pending(){return state==State.PREPARED||state==State.PAID||state==State.REFUND_PENDING;}
     }
     private final LandService lands;
@@ -41,7 +46,8 @@ public final class PurchaseCoordinator implements AutoCloseable {
                 if(claim.ownerId()==null||!key.equals("purchase."+claim.id()))throw new IllegalArgumentException("Journal identity mismatch");
                 String currency=data.get("currency").getAsString();long amount=data.get("amount").getAsBigDecimal().longValueExact();
                 if(currency.isBlank()||amount<0)throw new IllegalArgumentException("Invalid purchase quote");
-                entries.put(claim.id(),new Entry(claim,currency,amount,State.valueOf(data.get("state").getAsString())));
+                UUID beneficiary=data.has("beneficiary")?UUID.fromString(data.get("beneficiary").getAsString()):null;
+                entries.put(claim.id(),new Entry(claim,currency,amount,beneficiary,State.valueOf(data.get("state").getAsString())));
             }catch(RuntimeException malformed){throw new IOException("Invalid purchase journal: "+key,malformed);}
         }
         publishPending();
@@ -52,21 +58,22 @@ public final class PurchaseCoordinator implements AutoCloseable {
         pendingClaims=entries.values().stream().filter(Entry::pending).map(e->e.claim.id()).collect(java.util.stream.Collectors.toUnmodifiableSet());
         pendingCount=pendingClaims.size();
     }
-    public CompletableFuture<Outcome> purchase(LandClaim claim,String currency,long amount){
+    /** @param beneficiary the account the price is paid into, or null to take the money out of the economy */
+    public CompletableFuture<Outcome> purchase(LandClaim claim,String currency,long amount,UUID beneficiary){
         Objects.requireNonNull(claim);Objects.requireNonNull(currency);
         if(claim.ownerId()==null||currency.isBlank()||amount<0)throw new IllegalArgumentException("Invalid purchase intent");
         return CompletableFuture.supplyAsync(()->{
             try{
                 Entry known=entries.get(claim.id());
                 if(known!=null){
-                    if(!known.claim.equals(claim)||!known.currency.equals(currency)||known.amount!=amount)return result("CONFLICT",known,"OPERATION_MISMATCH");
+                    if(!known.claim.equals(claim)||!known.currency.equals(currency)||known.amount!=amount||!Objects.equals(known.beneficiary,beneficiary))return result("CONFLICT",known,"OPERATION_MISMATCH");
                     return advance(known);
                 }
                 for(Entry pending:entries.values())if(pending.pending()&&(
                         pending.claim.ownerId().equals(claim.ownerId())||pending.claim.name().equals(claim.name())||LandService.overlaps(pending.claim,claim)))
                     return result("PENDING",pending,"EXISTING_PURCHASE");
                 lands.checkCreation(claim);
-                Entry intent=new Entry(claim,currency,amount,State.PREPARED);save(intent);
+                Entry intent=new Entry(claim,currency,amount,beneficiary,State.PREPARED);save(intent);
                 return advance(intent);
             }catch(LandService.ClaimConflict conflict){return new Outcome("REJECTED",claim.id(),conflict.getMessage());}
             catch(Exception failure){return new Outcome("PENDING",claim.id(),root(failure).getClass().getSimpleName());}
@@ -95,7 +102,7 @@ public final class PurchaseCoordinator implements AutoCloseable {
             if(entry.amount>0&&payments==null)return result("PENDING",entry,"ECONOMY_UNAVAILABLE");
             save(entry); // A prior failed journal acknowledgement must be made durable before continuing.
             if(entry.state==State.PREPARED){
-                String payment=entry.amount==0?"OK":payments.debit(entry.claim.ownerId(),entry.currency,entry.amount,entry.claim.id().toString()).get(30,TimeUnit.SECONDS);
+                String payment=entry.amount==0?"OK":payments.debit(entry.claim.ownerId(),entry.beneficiary,entry.currency,entry.amount,entry.claim.id().toString()).get(30,TimeUnit.SECONDS);
                 if(!"OK".equals(payment)){
                     if(!Set.of("INSUFFICIENT_FUNDS","NO_ACCOUNT","UNKNOWN_CURRENCY").contains(payment))return result("PENDING",entry,payment);
                     save(entry.with(State.REJECTED));return result("REJECTED",entry,payment);
@@ -111,7 +118,7 @@ public final class PurchaseCoordinator implements AutoCloseable {
                 if(entry.state==State.PAID){save(entry.with(State.COMPLETED));return result("COMPLETED",entry,"");}
             }
             if(entry.state==State.REFUND_PENDING){
-                String refunded=entry.amount==0?"OK":payments.refund(entry.claim.ownerId(),entry.claim.id().toString()).get(30,TimeUnit.SECONDS);
+                String refunded=entry.amount==0?"OK":payments.refund(entry.claim.ownerId(),entry.beneficiary,entry.currency,entry.amount,entry.claim.id().toString()).get(30,TimeUnit.SECONDS);
                 if(!"OK".equals(refunded))return result("PENDING",entry,"REFUND_"+refunded);
                 save(entry.with(State.REFUNDED));return result("REFUNDED",entry,"CREATION_CONFLICT");
             }
@@ -121,6 +128,7 @@ public final class PurchaseCoordinator implements AutoCloseable {
     private void save(Entry entry)throws IOException{
         JsonObject data=new JsonObject();data.add("claim",DatasetRepository.encode(entry.claim));data.addProperty("currency",entry.currency);
         data.addProperty("amount",entry.amount);data.addProperty("state",entry.state.name());String key="purchase."+entry.claim.id();
+        if(entry.beneficiary!=null)data.addProperty("beneficiary",entry.beneficiary.toString());
         // Keep the intent reserved even if persistence succeeds but its acknowledgement is lost.
         Entry previous=entries.put(entry.claim.id(),entry);
         publishPending();

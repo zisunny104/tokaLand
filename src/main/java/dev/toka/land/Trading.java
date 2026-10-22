@@ -80,18 +80,42 @@ public final class Trading implements Listener, AutoCloseable {
         none.addProperty("tax", 1.0);
         JsonObject adjustment = plugin.providers().ask(player, request).orElse(none);
         long amount = pricing.quote(part, adjustment.get("offer").getAsDouble(), adjustment.get("tax").getAsDouble());
+        // The treasury (if the provider names one) receives the whole price and later pays the refund.
+        UUID treasury = adjustment.has("beneficiary") ? UUID.fromString(adjustment.get("beneficiary").getAsString()) : null;
+        // The refund is fixed now and can never exceed what was paid, so a discount cannot be turned into profit.
+        long refundValue = Math.min(pricing.refund(List.of(part)), amount);
         LandClaim claim = new LandClaim(UUID.randomUUID(), name, ClaimKind.PLAYER, "land", owner, null, false, false, List.of(part), List.of(),
-                AccessPolicy.privateDefault(), Map.of(), null, player.getName(), new ClaimDetails(owner, player.getName(), draft.teleport(), true));
-        return purchases.purchase(claim, pricing.currency(), amount);
+                AccessPolicy.privateDefault(), Map.of(), null, player.getName(),
+                new ClaimDetails(owner, player.getName(), draft.teleport(), true, refundValue, treasury));
+        return purchases.purchase(claim, pricing.currency(), amount, treasury);
     }
 
-    /** Deleting refunds only the claim's creator, and only from the claim's geometry. */
-    public CompletableFuture<PurchaseCoordinator.Outcome> sell(Player player, LandClaim claim) {
-        UUID creator = claim.details().creatorId();
-        String creatorName = claim.details().creatorName();
-        if (creator == null && creatorName != null && !creatorName.isBlank()) throw new IllegalStateException("CREATOR_IDENTITY_UNCONFIRMED");
-        long amount = player.getUniqueId().equals(creator) ? pricing.refund(claim.selections()) : 0;
-        return sales.sell(claim, player.getUniqueId(), pricing.currency(), amount);
+    /**
+     * Deleting pays the claim's refund value to its current owner, from the account that was paid for it.
+     * Claims from before refund values existed keep the old rule: only their creator is refunded, by geometry.
+     * If that account cannot cover the refund, deleting needs {@code acceptNoRefund}; nothing is deleted silently.
+     */
+    public CompletableFuture<PurchaseCoordinator.Outcome> sell(Player player, LandClaim claim, boolean acceptNoRefund) {
+        Long value = claim.details().refundValue();
+        UUID source = claim.details().refundSource();
+        UUID recipient = player.getUniqueId();
+        long amount;
+        if (value != null) {
+            var owner = ClaimAccess.effectiveOwner(plugin.index(), claim.id());
+            amount = owner.isPresent() ? value : 0;
+            if (owner.isPresent()) recipient = owner.get();
+        } else {
+            UUID creator = claim.details().creatorId();
+            String creatorName = claim.details().creatorName();
+            if (creator == null && creatorName != null && !creatorName.isBlank()) throw new IllegalStateException("CREATOR_IDENTITY_UNCONFIRMED");
+            amount = player.getUniqueId().equals(creator) ? pricing.refund(claim.selections()) : 0;
+        }
+        var money = ledger;
+        if (amount > 0 && source != null && money != null && !money.covers(source, pricing.currency(), amount).equals("OK")) {
+            if (!acceptNoRefund) throw new IllegalStateException("TREASURY_INSUFFICIENT");
+            amount = 0;
+        }
+        return sales.sell(claim, recipient, pricing.currency(), amount, amount > 0 ? source : null);
     }
 
     /** Called periodically: reconnects tokaEconomy after a reload and finishes interrupted transactions. */

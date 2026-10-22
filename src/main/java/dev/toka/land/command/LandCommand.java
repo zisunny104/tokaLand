@@ -217,8 +217,11 @@ public final class LandCommand extends Command {
         return true;
     }
     private void send(CommandSender sender,String key,Object...args){sender.sendMessage(plugin.texts().text(sender,key,args));}
-    private boolean manage(CommandSender sender,String action,String[] args){
+    private boolean manage(CommandSender sender,String action,String[] given){
         if(!(sender instanceof Player player)||!sender.hasPermission("tokaland.use")){send(sender,"command.denied");return true;}
+        // "norefund" accepts deleting without a refund when the treasury cannot cover it.
+        boolean noRefund=action.equals("del")&&Arrays.stream(given).skip(1).anyMatch(a->a.equalsIgnoreCase("norefund"));
+        final String[] args=noRefund?Arrays.stream(given).filter(a->!a.equalsIgnoreCase("norefund")).toArray(String[]::new):given;
         try{
             String target=null;
             if(action.equals("tpl")||action.equals("del")){if(args.length>2){send(sender,"command.usage");return true;}if(args.length==2)target=args[1];}
@@ -229,7 +232,7 @@ public final class LandCommand extends Command {
             }else{if(args.length<2||args.length>3){send(sender,"command.usage");return true;}if(args.length==3)target=args[2];}
             LandClaim before=ClaimTargets.resolve(plugin.management().claimsAround(player),target);plugin.management().check(player,before);
             if(action.equals("del")){
-                plugin.trading().sell(player,before).whenComplete((result,error)->plugin.getServer().getScheduler().scheduleTask(plugin,()->{
+                plugin.trading().sell(player,before,noRefund).whenComplete((result,error)->plugin.getServer().getScheduler().scheduleTask(plugin,()->{
                     if(error!=null)send(sender,"purchase.unavailable",error.getClass().getSimpleName());
                     else send(sender,"management.saleResult",result.status(),result.operation(),result.detail());
                 }));send(sender,"management.saleStarted");return true;
@@ -263,7 +266,7 @@ public final class LandCommand extends Command {
             }));
         }catch(ClaimTargets.Ambiguous ambiguous){
             send(sender,"management.ambiguous");for(var match:ambiguous.matches())send(sender,"management.target",match.name(),match.id());
-        }catch(RuntimeException failure){send(sender,"purchase.unavailable",failure.getMessage());}
+        }catch(RuntimeException failure){send(sender,"TREASURY_INSUFFICIENT".equals(failure.getMessage())?"management.treasuryShort":"purchase.unavailable",failure.getMessage());}
         return true;
     }
 }

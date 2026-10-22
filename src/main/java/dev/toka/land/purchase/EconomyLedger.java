@@ -5,27 +5,46 @@ import java.lang.reflect.Method;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
-/** Soft dependency on the durable debit/refund contract. Causes and methods are captured on the server thread. */
+/**
+ * Soft dependency on tokaEconomy's durable payments. With a treasury account, money moves in one fee-free transfer;
+ * without one the price leaves the economy and refunds are created, as before.
+ */
 public final class EconomyLedger implements PurchaseCoordinator.Ledger {
-    private final Method debit,refund,credit,status;
-    private final Object purchaseCause,refundCause,saleCause;
+    private final Method withdraw,refundWithdrawal,deposit,transfer,has,status;
+    private final Object purchaseCause,compensateCause,saleCause;
     private volatile boolean available=true;
     public EconomyLedger(Plugin plugin)throws ReflectiveOperationException{
         ClassLoader loader=plugin.getClass().getClassLoader();
         Class<?> api=Class.forName("dev.toka.economy.Economy",true,loader);
         Class<?> cause=Class.forName("dev.toka.economy.Cause",true,loader);
         status=Class.forName("dev.toka.economy.Result",true,loader).getMethod("status");
-        debit=api.getMethod("withdrawOnce",UUID.class,String.class,long.class,cause,String.class);
-        credit=api.getMethod("depositOnce",UUID.class,String.class,long.class,cause,String.class);
-        refund=api.getMethod("refundWithdrawalOnce",UUID.class,cause,String.class,cause);
+        withdraw=api.getMethod("withdrawOnce",UUID.class,String.class,long.class,cause,String.class);
+        deposit=api.getMethod("depositOnce",UUID.class,String.class,long.class,cause,String.class);
+        refundWithdrawal=api.getMethod("refundWithdrawalOnce",UUID.class,cause,String.class,cause);
+        transfer=api.getMethod("transferOnce",UUID.class,UUID.class,String.class,long.class,cause,String.class);
+        has=api.getMethod("has",UUID.class,String.class,long.class);
         Method of=cause.getMethod("of",String.class,String.class);
-        purchaseCause=of.invoke(null,"land-purchase","tokaLand");refundCause=of.invoke(null,"land-compensate","tokaLand");
+        purchaseCause=of.invoke(null,"land-purchase","tokaLand");compensateCause=of.invoke(null,"land-compensate","tokaLand");
         saleCause=of.invoke(null,"land-sale","tokaLand");
     }
     public void disconnect(){available=false;}
-    @Override public CompletableFuture<String> debit(UUID player,String currency,long amount,String operation){return invoke(debit,player,currency,amount,purchaseCause,operation);}
-    @Override public CompletableFuture<String> refund(UUID player,String operation){return invoke(refund,player,purchaseCause,operation,refundCause);}
-    @Override public CompletableFuture<String> credit(UUID player,String currency,long amount,String operation){return invoke(credit,player,currency,amount,saleCause,operation);}
+    @Override public CompletableFuture<String> debit(UUID player,UUID beneficiary,String currency,long amount,String operation){
+        return beneficiary==null?invoke(withdraw,player,currency,amount,purchaseCause,operation)
+            :invoke(transfer,player,beneficiary,currency,amount,purchaseCause,operation);
+    }
+    @Override public CompletableFuture<String> refund(UUID player,UUID beneficiary,String currency,long amount,String operation){
+        return beneficiary==null?invoke(refundWithdrawal,player,purchaseCause,operation,compensateCause)
+            :invoke(transfer,beneficiary,player,currency,amount,compensateCause,"refund:"+operation);
+    }
+    @Override public CompletableFuture<String> credit(UUID player,UUID source,String currency,long amount,String operation){
+        return source==null?invoke(deposit,player,currency,amount,saleCause,operation)
+            :invoke(transfer,source,player,currency,amount,saleCause,operation);
+    }
+    @Override public String covers(UUID account,String currency,long amount){
+        if(!available)return "UNAVAILABLE";
+        try{return status.invoke(has.invoke(null,account,currency,amount)).toString();}
+        catch(ReflectiveOperationException|LinkageError failure){return "UNAVAILABLE";}
+    }
     private CompletableFuture<String> invoke(Method method,Object...args){
         if(!available)return CompletableFuture.completedFuture("UNAVAILABLE");
         try{
