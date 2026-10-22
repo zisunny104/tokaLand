@@ -38,7 +38,9 @@ public final class LandCommand extends Command {
             action.equals("type")?CommandParameter.newEnum("value",new CommandEnum("TokaLandType",new String[]{"land","pvp"})):CommandParameter.newType("value",CommandParamType.STRING),CommandParameter.newType("claim",true,CommandParamType.STRING)});
         addCommandParameters("groupEdit",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandGroup",new String[]{"group","grp"})),CommandParameter.newEnum("mode",new CommandEnum("TokaLandGroupEdit",new String[]{"add","del"})),CommandParameter.newType("player",CommandParamType.STRING),CommandParameter.newType("claim",true,CommandParamType.STRING)});
         addCommandParameters("groupList",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandGroupListAction",new String[]{"group","grp"})),CommandParameter.newEnum("mode",new CommandEnum("TokaLandGroupList",new String[]{"list"})),CommandParameter.newType("claim",true,CommandParamType.STRING)});
-        addCommandParameters("del",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandDeleteAction",new String[]{"del"})),CommandParameter.newType("claim",true,CommandParamType.STRING)});
+        addCommandParameters("del",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandDeleteAction",new String[]{"del"})),CommandParameter.newType("claim",true,CommandParamType.STRING),
+            CommandParameter.newEnum("refund",true,new CommandEnum("TokaLandDeleteRefund",new String[]{"norefund"}))});
+        addCommandParameters("facHelp",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandFacilityHelpAction",new String[]{"fac","facility"})),CommandParameter.newEnum("what",new CommandEnum("TokaLandFacilityHelp",new String[]{"help"}))});
         addCommandParameters("select",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandSelectAction",new String[]{"select","slt"})),CommandParameter.newEnum("mode",new CommandEnum("TokaLandSelectMode",new String[]{"size","vert"}))});
         addCommandParameters("list",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandListAction",new String[]{"list"})),CommandParameter.newType("page",true,CommandParamType.INT)});
         addCommandParameters("facility",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandFacilityAction",new String[]{"fac","facility"})),
@@ -74,7 +76,6 @@ public final class LandCommand extends Command {
                 ||action.equals("tpl")&&sender instanceof Player p&&(args.length>1||!plugin.management().claimsAround(p).isEmpty()))return manage(sender,action,args);
         if(action.equals("fac")||action.equals("facility"))return facilityCommand(sender,args);
         if(Set.of("set","tpl","select","slt").contains(action))return purchaseCommand(sender,action,args);
-        if(!sender.hasPermission("tokaland.inspect")){send(sender,"command.denied");return true;}
         if(sender instanceof Player self&&sender.hasPermission("tokaland.use")){
             if((action.equals("menu")||action.equals("gui"))&&args.length==1){plugin.window().open(self);return true;}
             if(action.equals("info")&&args.length==1)return tools.localInfo(self);
@@ -82,6 +83,7 @@ public final class LandCommand extends Command {
             if(action.equals("list")&&args.length==1&&!sender.hasPermission("tokaland.inspect"))return tools.ownerList(sender,self.getName());
             if(Set.of("reset","clear","grant","refund").contains(action))return adminTool(self,action,args);
         }
+        if(!sender.hasPermission("tokaland.inspect")){send(sender,"command.denied");return true;}
         if(action.equals("status")&&args.length==1){send(sender,"command.status",Main.ownsLand()?"ACTIVE":"STANDBY",plugin.allClaims().size());return true;}
         if(action.equals("list")&&args.length<=2){
             int page=1;

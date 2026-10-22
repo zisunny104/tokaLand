@@ -28,7 +28,7 @@ public final class SelectionToolListener implements Listener {
     private final Main plugin;
     private final int itemId;
     private final int itemDamage;
-    private final Map<UUID,Selection> selections=new HashMap<>();
+    private final Map<UUID,Selection> selections=new java.util.concurrent.ConcurrentHashMap<>();
 
     public SelectionToolListener(Main plugin,Item configuredItem) {
         this.plugin=plugin;
