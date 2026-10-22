@@ -96,6 +96,7 @@ public final class Main extends PluginBase {
         plugins.registerEvents(trading, this);
         plugins.registerEvents(management, this);
         plugins.registerEvents(new PlayerProtectionListener(this), this);
+        plugins.registerEvents(new PvpListener(this), this);
         plugins.registerEvents(new NaturalChangeListener(this), this);
         var explosions = new ExplosionProtectionListener(Main::ownsLand, queries::cancelUnknownBlastRange,
                 queries::cancelEntityExplosion, () -> getServer().getTick(), line -> getLogger().warning(line));
@@ -257,6 +258,12 @@ public final class Main extends PluginBase {
             rows.add(row);
         }
         return rows.toString();
+    }
+
+    /** Whether the player owns at least one claim; false while Land is not ready. Thread-safe. */
+    public static boolean ownsAnyClaim(UUID player) {
+        Main main = instance;
+        return main != null && main.isReady() && !main.index().ownedBy(player).isEmpty();
     }
 
     public static String exportDatasetJson() {

@@ -9,6 +9,7 @@ import com.google.gson.JsonObject;
 import dev.toka.land.model.*;
 import dev.toka.land.protection.ExplosionAttribution;
 import dev.toka.land.protection.ExplosionRules;
+import dev.toka.land.protection.PvpPolicy;
 import java.util.*;
 import java.util.function.Predicate;
 
@@ -98,6 +99,13 @@ public final class ProtectionQueries {
         Set<UUID> ids = new HashSet<>();
         claims.forEach(claim -> ids.add(claim.id()));
         return ids;
+    }
+
+    /** Both players in PvP claims: the listener then overrides damage protection that something else applied. */
+    public boolean pvpAllowed(Player victim, Player attacker) {
+        if (!Main.ownsLand() || plugin.maintenanceLocked()) return false;
+        return PvpPolicy.allows(plugin.findAllAt(victim.getLevel().getFolderName(), victim.getFloorX(), victim.getFloorY(), victim.getFloorZ()),
+                plugin.findAllAt(attacker.getLevel().getFolderName(), attacker.getFloorX(), attacker.getFloorY(), attacker.getFloorZ()));
     }
 
     private static String reply(String status, boolean allowed, String reason, List<UUID> hits, List<UUID> blocked) {
