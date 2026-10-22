@@ -49,6 +49,15 @@ tools:
   helpList: "§e/land list [玩家] §7— 列出玩家擁有的領地（不填為自己）"
   helpReset: "§e/land reset [領地ID或名稱] §7— 以目前選區取代領地範圍（管理員）"
   helpClear: "§e/land clear [confirm] §7— 預覽並刪除選區內所有玩家領地，不退款（管理員）"
+window:
+  title: "領地管理"
+  empty: "你還沒有任何領地。"
+  listText: "你有 ${0} 塊領地（第 ${1}/${2} 頁），選擇一塊查看。"
+  prev: "上一頁"
+  next: "下一頁"
+  back: "返回"
+  close: "關閉"
+  help: "§e/land menu §7— 開啟領地視窗；別名 gui"
 facility:
   help: "§e/land fac <類型> [名稱] §7— 以已選範圍建立設施領地；同名則追加選區（管理員）"
   created: "§a[設施] 已建立 ${0}（${1}）。"

@@ -45,6 +45,7 @@ public final class LandCommand extends Command {
         addCommandParameters("facilitymode",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandFacilityActionmode",new String[]{"fac","facility"})),
             CommandParameter.newEnum("sub",new CommandEnum("TokaLandFacilitySubmode",new String[]{"mode"})),CommandParameter.newType("name",CommandParamType.STRING),
             CommandParameter.newEnum("value",new CommandEnum("TokaLandFacilityModeValue",new String[]{"open","protect","private"}))});
+        addCommandParameters("menu",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandMenuAction",new String[]{"menu","gui"}))});
         addCommandParameters("localInfo",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandLocalInfoAction",new String[]{"info"}))});
         addCommandParameters("ownerList",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandOwnerListAction",new String[]{"list"})),CommandParameter.newType("player",true,CommandParamType.TARGET)});
         addCommandParameters("reset",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandResetAction",new String[]{"reset"})),CommandParameter.newType("claim",true,CommandParamType.STRING)});
@@ -57,7 +58,7 @@ public final class LandCommand extends Command {
         if(action.equals("help")&&args.length<=1){
             if(sender.hasPermission("tokaland.inspect"))for(String key:List.of("command.helpStatus","command.helpList","command.helpInfo"))send(sender,key);
             if(sender.hasPermission("tokaland.use"))for(String key:List.of("purchase.helpSet","purchase.helpTpl","purchase.helpSelect"))send(sender,key);
-            if(sender.hasPermission("tokaland.use"))for(String key:List.of("tools.helpInfo","tools.helpList"))send(sender,key);
+            if(sender.hasPermission("tokaland.use"))for(String key:List.of("tools.helpInfo","tools.helpList","window.help"))send(sender,key);
             if(sender.hasPermission("tokaland.admin"))for(String key:List.of("tools.helpReset","tools.helpClear","facility.helpManage"))send(sender,key);
             if(sender.hasPermission("tokaland.admin"))send(sender,"facility.help");
             if(sender.hasPermission("tokaland.use"))for(String key:List.of("management.helpRename","management.helpGive","management.helpType","management.helpGroup","management.helpDel"))send(sender,key);
@@ -70,6 +71,7 @@ public final class LandCommand extends Command {
         if(Set.of("set","tpl","select","slt").contains(action))return purchaseCommand(sender,action,args);
         if(!sender.hasPermission("tokaland.inspect")){send(sender,"command.denied");return true;}
         if(sender instanceof Player self&&sender.hasPermission("tokaland.use")){
+            if((action.equals("menu")||action.equals("gui"))&&args.length==1){plugin.window().open(self);return true;}
             if(action.equals("info")&&args.length==1)return tools.localInfo(self);
             if(action.equals("list")&&args.length==2&&!args[1].chars().allMatch(Character::isDigit))return tools.ownerList(sender,args[1]);
             if(action.equals("list")&&args.length==1&&!sender.hasPermission("tokaland.inspect"))return tools.ownerList(sender,self.getName());

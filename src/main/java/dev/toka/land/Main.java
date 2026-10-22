@@ -4,6 +4,7 @@ import cn.nukkit.Player;
 import cn.nukkit.plugin.PluginBase;
 import com.google.gson.JsonArray;
 import dev.toka.land.command.LandCommand;
+import dev.toka.land.form.LandWindow;
 import dev.toka.land.model.LandClaim;
 import dev.toka.land.model.LandIndex;
 import dev.toka.land.protection.*;
@@ -37,6 +38,7 @@ public final class Main extends PluginBase {
     private DatasetAPI dataset;
     private Texts texts;
     private TopbarService topbar;
+    private LandWindow window;
     private PlayerNames playerNames;
     private ExplosionRules explosionRules;
     private SelectionToolListener selectionTool;
@@ -72,6 +74,7 @@ public final class Main extends PluginBase {
             facilities = new Facilities(this, lands, config);
             dataset = new DatasetAPI(lands, trading);
             topbar = new TopbarService(this);
+            window = new LandWindow(this);
             registerListeners();
             ready = true;
             trading.connectEconomy();
@@ -89,6 +92,7 @@ public final class Main extends PluginBase {
         var plugins = getServer().getPluginManager();
         plugins.registerEvents(new ClaimTracker(this), this);
         plugins.registerEvents(topbar, this);
+        plugins.registerEvents(window, this);
         plugins.registerEvents(trading, this);
         plugins.registerEvents(new PlayerProtectionListener(this), this);
         plugins.registerEvents(new NaturalChangeListener(this), this);
@@ -168,6 +172,7 @@ public final class Main extends PluginBase {
     public Facilities facilities() { return facilities; }
     public Texts texts() { return texts; }
     public ProtectionQueries queries() { return queries; }
+    public LandWindow window() { return window; }
 
     // ---- Entry points other plugins call by reflection; names and signatures are a contract --------------------
 
