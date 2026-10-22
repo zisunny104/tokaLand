@@ -16,13 +16,22 @@ import java.util.*;
 public final class LandCommand extends Command {
     private final Main plugin;
     private final ClaimTools tools;
+    private final HelpPages help;
     public LandCommand(Main plugin) {
         super("land", "Land 領地管理", "/land help");
         this.plugin=plugin;
         this.tools=new ClaimTools(plugin);
+        this.help=new HelpPages("land",List.of(
+            new HelpPages.Section("read","tokaland.use",List.of("menu","info","list")),
+            new HelpPages.Section("manage","tokaland.use",List.of("select","tpl","set","rename","give","type","group","del","note")),
+            new HelpPages.Section("admin","tokaland.admin",List.of("grant","refund","reset","clear","fac","facHelp")),
+            new HelpPages.Section("facility","tokaland.admin",List.of("facCreate","facList","facDel","facType","facMode","facLock")),
+            new HelpPages.Section("inspect","tokaland.inspect",List.of("status","adminList","adminInfo"))),(sender,key,args)->plugin.texts().text(sender,key,args));
         setPermission("tokaland.use;tokaland.inspect");
         getCommandParameters().clear();
-        addCommandParameters("summary",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandReadAction",new String[]{"help","status"}))});
+        addCommandParameters("summary",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandReadAction",new String[]{"status"}))});
+        addCommandParameters("help",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandHelpAction",new String[]{"help"})),
+            CommandParameter.newEnum("section",true,new CommandEnum("TokaLandHelpSection",new String[]{"read","manage","admin","facility","inspect"})),CommandParameter.newType("page",true,CommandParamType.INT)});
         addCommandParameters("set",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandSetAction",new String[]{"set"})),CommandParameter.newType("name",CommandParamType.STRING)});
         addCommandParameters("tpl",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandTplAction",new String[]{"tpl"})),CommandParameter.newType("claim",true,CommandParamType.STRING)});
         for(String action:List.of("rename","give","type"))addCommandParameters(action,new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLand"+action,new String[]{action})),
@@ -59,7 +68,7 @@ public final class LandCommand extends Command {
     @Override public boolean execute(CommandSender sender,String label,String[] args) {
         if(!testPermissionSilent(sender)){send(sender,"command.denied");return true;}
         String action=args.length==0?"help":args[0].toLowerCase(Locale.ROOT);
-        if(action.equals("help")&&args.length<=1){showHelp(sender);return true;}
+        if(action.equals("help")){help.show(sender,args.length>1?java.util.Arrays.copyOfRange(args,1,args.length):new String[0]);return true;}
         if(!plugin.isReady()){send(sender,"ui.unavailable","Land");return true;}
         if(Set.of("rename","give","type","group","grp","del").contains(action)
                 ||action.equals("tpl")&&sender instanceof Player p&&(args.length>1||!plugin.management().claimsAround(p).isEmpty()))return manage(sender,action,args);
@@ -131,22 +140,6 @@ public final class LandCommand extends Command {
         }catch(RuntimeException failure){send(sender,"purchase.unavailable",failure.getMessage());return true;}
         send(sender,"command.usage");return true;
     }
-    /** Help in three sections; each line shows only what the sender may use. */
-    private void showHelp(CommandSender sender){
-        send(sender,"help.title");
-        if(sender.hasPermission("tokaland.use")){
-            send(sender,"help.secRead");for(String key:List.of("menu","info","list"))send(sender,"help."+key);
-            send(sender,"help.secManage");for(String key:List.of("select","tpl","set","rename","give","type","group","del","note"))send(sender,"help."+key);
-        }
-        if(sender.hasPermission("tokaland.admin")){
-            send(sender,"help.secAdmin");for(String key:List.of("grant","refund","reset","clear","fac","facHelp"))send(sender,"help."+key);
-        }
-        if(sender.hasPermission("tokaland.inspect"))for(String key:List.of("status","adminList","adminInfo"))send(sender,"help."+key);
-    }
-    private void facilityHelp(CommandSender sender){
-        send(sender,"help.facTitle");
-        for(String key:List.of("create","list","del","type","mode","lock"))send(sender,"fachelp."+key);
-    }
     private boolean adminTool(Player player,String action,String[] args){
         if(!player.hasPermission("tokaland.admin")){send(player,"command.denied");return true;}
         try{
@@ -216,7 +209,7 @@ public final class LandCommand extends Command {
                     if(args.length==4&&!on&&!args[3].equalsIgnoreCase("off")){send(player,"command.usage");return true;}
                     facilities.lock(player,args[2],on).whenComplete((r,e)->done(player,e,on?"facility.locked":"facility.unlocked",args[2]));
                 }
-                case "help" -> facilityHelp(player);
+                case "help" -> help.show(player,new String[]{"facility"});
                 default -> send(player,"command.usage");
             }
         }catch(NumberFormatException invalid){send(player,"command.invalidPage");}
