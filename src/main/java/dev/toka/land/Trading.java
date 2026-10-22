@@ -82,6 +82,9 @@ public final class Trading implements Listener, AutoCloseable {
         long amount = pricing.quote(part, adjustment.get("offer").getAsDouble(), adjustment.get("tax").getAsDouble());
         // The treasury (if the provider names one) receives the whole price and later pays the refund.
         UUID treasury = adjustment.has("beneficiary") ? UUID.fromString(adjustment.get("beneficiary").getAsString()) : null;
+        // An account the economy cannot pay into is treated as no treasury, so the refund is never drawn from money it never got.
+        var money = ledger;
+        if (treasury != null && money != null && !money.accepts(treasury)) treasury = null;
         // The refund is fixed now and can never exceed what was paid, so a discount cannot be turned into profit.
         long refundValue = Math.min(pricing.refund(List.of(part)), amount);
         LandClaim claim = new LandClaim(UUID.randomUUID(), name, ClaimKind.PLAYER, "land", owner, null, false, false, List.of(part), List.of(),

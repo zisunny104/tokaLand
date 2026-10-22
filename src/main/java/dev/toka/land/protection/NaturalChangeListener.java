@@ -11,7 +11,6 @@ import cn.nukkit.event.entity.EntityInteractEvent;
 import cn.nukkit.event.level.StructureGrowEvent;
 import cn.nukkit.event.weather.LightningStrikeEvent;
 import dev.toka.land.Main;
-import cn.nukkit.level.Position;
 
 /**
  * Boundary-aware protection for non-player world changes.

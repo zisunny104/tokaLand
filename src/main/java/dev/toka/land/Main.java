@@ -93,6 +93,7 @@ public final class Main extends PluginBase {
         plugins.registerEvents(topbar, this);
         plugins.registerEvents(window, this);
         plugins.registerEvents(trading, this);
+        plugins.registerEvents(management, this);
         plugins.registerEvents(new PlayerProtectionListener(this), this);
         plugins.registerEvents(new NaturalChangeListener(this), this);
         plugins.registerEvents(new PvpListener(this), this);

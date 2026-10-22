@@ -8,7 +8,6 @@ import cn.nukkit.event.block.BlockExplodeEvent;
 import cn.nukkit.event.entity.EntityExplodeEvent;
 import cn.nukkit.event.entity.EntityExplosionPrimeEvent;
 import cn.nukkit.level.Position;
-import cn.nukkit.scheduler.TaskHandler;
 import java.util.IdentityHashMap;
 import java.util.Map;
 

@@ -21,6 +21,8 @@ public final class PurchaseCoordinator implements AutoCloseable {
         default CompletableFuture<String> credit(UUID player,UUID source,String currency,long amount,String operation){return CompletableFuture.failedFuture(new UnsupportedOperationException("Credit API unavailable"));}
         /** Whether the account holds the amount: OK, INSUFFICIENT_FUNDS or another status. */
         default String covers(UUID account,String currency,long amount){return "OK";}
+        /** Whether payments can really be moved into this account; if not, a purchase must not record it as the refund source. */
+        default boolean accepts(UUID account){return true;}
     }
     public record Outcome(String status,UUID operation,String detail){}
     private enum State { PREPARED, PAID, REFUND_PENDING, COMPLETED, REFUNDED, REJECTED }

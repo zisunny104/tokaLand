@@ -7,7 +7,6 @@ import dev.toka.land.model.ClaimPermission;
 import dev.toka.land.model.LandClaim;
 import dev.toka.land.model.ClaimEdits;
 import dev.toka.land.model.LandSelection;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -15,7 +14,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 /** Who may edit an existing player claim, and the edit itself. */
-public final class Management {
+public final class Management implements cn.nukkit.event.Listener {
     private final Main plugin;
     private final LandService lands;
     private final Trading trading;
@@ -53,6 +52,10 @@ public final class Management {
     public CompletableFuture<String> edit(Player player, LandClaim before, LandClaim after) {
         check(player, before);
         return lands.edit(before, after);
+    }
+
+    @cn.nukkit.event.EventHandler public void onQuit(cn.nukkit.event.player.PlayerQuitEvent event) {
+        clearPreviews.remove(event.getPlayer().getUniqueId());
     }
 
     private LandSelection draft(Player player) {

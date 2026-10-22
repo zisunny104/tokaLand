@@ -18,9 +18,7 @@ public record ClaimDetails(UUID creatorId, String creatorName, TeleportPoint tel
     public ClaimDetails withTeleport(TeleportPoint point) {
         return new ClaimDetails(creatorId, creatorName, point, publicTeleport, refundValue, refundSource);
     }
-    public ClaimDetails withRefund(Long value, UUID source) {
-        return new ClaimDetails(creatorId, creatorName, teleport, publicTeleport, value, source);
-    }
+
     public record TeleportPoint(String world, double x, double y, double z, float yaw, float pitch) {
         public TeleportPoint {
             if(world==null||world.isBlank()||!Double.isFinite(x)||!Double.isFinite(y)||!Double.isFinite(z)

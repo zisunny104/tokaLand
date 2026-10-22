@@ -53,6 +53,7 @@ public final class EconomyLedger implements PurchaseCoordinator.Ledger {
         return !usable(source)?invoke(deposit,player,currency,amount,saleCause,operation)
             :invoke(transfer,source,player,currency,amount,saleCause,operation);
     }
+    @Override public boolean accepts(UUID account){return usable(account);}
     @Override public String covers(UUID account,String currency,long amount){
         if(!available)return "UNAVAILABLE";
         if(!usable(account))return "OK";
