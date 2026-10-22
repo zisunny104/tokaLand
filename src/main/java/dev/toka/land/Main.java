@@ -97,7 +97,6 @@ public final class Main extends PluginBase {
         plugins.registerEvents(management, this);
         plugins.registerEvents(new PlayerProtectionListener(this), this);
         plugins.registerEvents(new NaturalChangeListener(this), this);
-        plugins.registerEvents(new PvpListener(this), this);
         var explosions = new ExplosionProtectionListener(Main::ownsLand, queries::cancelUnknownBlastRange,
                 queries::cancelEntityExplosion, () -> getServer().getTick(), line -> getLogger().warning(line));
         plugins.registerEvents(explosions, this);
@@ -243,12 +242,12 @@ public final class Main extends PluginBase {
     }
 
     /**
-     * The claims at a point as a JSON array of {id, kind, type}; "[]" when none or Land is not ready. Safe from any thread
-     * (it reads an immutable snapshot). Used by tokaProtect to tell claimed land from unclaimed land.
+     * The claims at a point as a JSON array of {id, kind, type}, "[]" when there are none, or null when Land is not ready
+     * (so a caller never mistakes "unknown" for "unclaimed"). Safe from any thread: it reads an immutable snapshot.
      */
     public static String claimsAtJson(String world, int x, int y, int z) {
         Main main = instance;
-        if (main == null || !main.isReady()) return "[]";
+        if (main == null || !main.isReady()) return null;
         JsonArray rows = new JsonArray();
         for (var claim : main.index().findAllAt(world, x, y, z)) {
             JsonObject row = new JsonObject();
