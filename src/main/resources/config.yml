@@ -39,3 +39,24 @@ selection:
   enabled: true
   # 可用 Nukkit Item 名稱或 ID:damage；預設沿用 zero 的木鋤（290）。
   tool: "290:0"
+
+facility:
+  # 設施領地類型，可自行增加（小寫英文、數字、_ 或 -，最長 16 字）。
+  # below／above：選取方塊往下、往上額外保護的格數；鐵路不擴張。
+  types:
+    road:
+      below: 2
+      above: 5
+    rail:
+      below: 0
+      above: 0
+
+pricing:
+  # 購地基礎價格；優待與稅務不在此處，由區域／稅務 provider 提供倍率。
+  currency: money
+  # 立體領地每方塊單價。
+  per-block: 6.3
+  # 平面（忽略高度）領地每方塊單價，只計平面面積。
+  per-block-flat: 73.1
+  # 刪除領地時退還基礎價格的比例，只退給建立者。
+  refund-rate: 0.7

@@ -58,12 +58,12 @@ public final class SelectionToolListener implements Listener {
     }
     private void capture(Player player,Point point,boolean first){
         try{
-            boolean ignoreHeight=plugin.selectionIgnoreHeight(player,point);Selection previous=selections.get(player.getUniqueId());
+            boolean ignoreHeight=plugin.trading().ignoreHeight(player,point);Selection previous=selections.get(player.getUniqueId());
             Point other=previous==null?null:first?previous.second():previous.first();
             if(other!=null&&!other.world().equals(point.world()))other=null;
             var updated=first?new Selection(point,other,ignoreHeight,null):new Selection(other,point,ignoreHeight,null);
-            selections.put(player.getUniqueId(),updated);plugin.sendSelectionPoint(player,first,point);
-        }catch(RuntimeException failure){player.sendMessage(plugin.text(player,"purchase.unavailable",failure.getMessage()));}
+            selections.put(player.getUniqueId(),updated);plugin.texts().sendSelectionPoint(player,first,point);
+        }catch(RuntimeException failure){player.sendMessage(plugin.texts().text(player,"purchase.unavailable",failure.getMessage()));}
     }
     public Selection toggleHeight(UUID player){
         Selection old=selections.get(player);if(old==null)throw new IllegalStateException("SELECTION_REQUIRED");

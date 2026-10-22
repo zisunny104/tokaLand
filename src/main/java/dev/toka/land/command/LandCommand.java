@@ -29,6 +29,8 @@ public final class LandCommand extends Command {
         addCommandParameters("del",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandDeleteAction",new String[]{"del"})),CommandParameter.newType("claim",true,CommandParamType.STRING)});
         addCommandParameters("select",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandSelectAction",new String[]{"select","slt"})),CommandParameter.newEnum("mode",new CommandEnum("TokaLandSelectMode",new String[]{"size","vert"}))});
         addCommandParameters("list",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandListAction",new String[]{"list"})),CommandParameter.newType("page",true,CommandParamType.INT)});
+        addCommandParameters("facility",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandFacilityAction",new String[]{"fac","facility"})),
+            CommandParameter.newEnum("type",new CommandEnum("TokaLandFacilityType",plugin.facilities().types().names().toArray(new String[0]))),CommandParameter.newType("name",true,CommandParamType.STRING)});
         addCommandParameters("info",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandInfoAction",new String[]{"info"})),CommandParameter.newType("claimId",CommandParamType.STRING)});
     }
     @Override public boolean execute(CommandSender sender,String label,String[] args) {
@@ -37,12 +39,14 @@ public final class LandCommand extends Command {
         if(action.equals("help")&&args.length<=1){
             if(sender.hasPermission("tokaland.inspect"))for(String key:List.of("command.helpStatus","command.helpList","command.helpInfo"))send(sender,key);
             if(sender.hasPermission("tokaland.use"))for(String key:List.of("purchase.helpSet","purchase.helpTpl","purchase.helpSelect"))send(sender,key);
+            if(sender.hasPermission("tokaland.admin"))send(sender,"facility.help");
             if(sender.hasPermission("tokaland.use"))for(String key:List.of("management.helpRename","management.helpGive","management.helpType","management.helpGroup","management.helpDel"))send(sender,key);
             return true;
         }
         if(!plugin.isReady()){send(sender,"ui.unavailable","Land");return true;}
         if(Set.of("rename","give","type","group","grp","del").contains(action)
-                ||action.equals("tpl")&&sender instanceof Player p&&(args.length>1||!plugin.localPlayerClaims(p).isEmpty()))return manage(sender,action,args);
+                ||action.equals("tpl")&&sender instanceof Player p&&(args.length>1||!plugin.management().claimsAround(p).isEmpty()))return manage(sender,action,args);
+        if(action.equals("fac")||action.equals("facility"))return facilityCommand(sender,args);
         if(Set.of("set","tpl","select","slt").contains(action))return purchaseCommand(sender,action,args);
         if(!sender.hasPermission("tokaland.inspect")){send(sender,"command.denied");return true;}
         if(action.equals("status")&&args.length==1){send(sender,"command.status",Main.ownsLand()?"ACTIVE":"STANDBY",plugin.allClaims().size());return true;}
@@ -55,7 +59,7 @@ public final class LandCommand extends Command {
             if(page>pages){send(sender,"command.invalidPage");return true;}
             send(sender,"command.listHeader",page,pages,claims.size());
             for(int i=(page-1)*10;i<Math.min((long)page*10,claims.size());i++){
-                LandClaim claim=claims.get(i);send(sender,"command.listRow",claim.id(),claim.displayName(plugin.language(sender)),claim.kind());
+                LandClaim claim=claims.get(i);send(sender,"command.listRow",claim.id(),claim.displayName(plugin.texts().language(sender)),claim.kind());
             }
             return true;
         }
@@ -65,7 +69,7 @@ public final class LandCommand extends Command {
             var found=plugin.getClaim(id);
             if(found.isEmpty()){send(sender,"command.notFound",id);return true;}
             var claim=found.get();
-            send(sender,"command.info",claim.id(),claim.displayName(plugin.language(sender)),plugin.ownerDisplay(claim,plugin.language(sender)),claim.world(),claim.kind(),claim.type(),claim.accessPolicy().mode()+(claim.accessPolicy().locked()?" + LOCK":""),claim.selections().size());
+            send(sender,"command.info",claim.id(),claim.displayName(plugin.texts().language(sender)),plugin.texts().ownerText(claim,plugin.texts().language(sender)),claim.world(),claim.kind(),claim.type(),claim.accessPolicy().mode()+(claim.accessPolicy().locked()?" + LOCK":""),claim.selections().size());
             for(var part:claim.selections())send(sender,"command.selection",part.id(),part.minX(),part.minY(),part.minZ(),part.maxX(),part.maxY(),part.maxZ(),part.ignoreHeight());
             return true;
         }
@@ -93,7 +97,7 @@ public final class LandCommand extends Command {
                 // Retain the old name parsing until any command-format change is explicitly agreed.
                 StringBuilder name=new StringBuilder(args[1]);for(int i=2;i<args.length;i++)name.append(args[i]).append('_');
                 var selected=tool.get(player.getUniqueId());
-                var work=plugin.purchase(player,name.toString());send(sender,"purchase.started");
+                var work=plugin.trading().purchase(player,name.toString());send(sender,"purchase.started");
                 work.whenComplete((result,error)->plugin.getServer().getScheduler().scheduleTask(plugin,()->{
                     if(error!=null){send(sender,"purchase.unavailable",error.getClass().getSimpleName());return;}
                     if(result.status().equals("COMPLETED"))tool.forget(player.getUniqueId(),selected);
@@ -103,7 +107,22 @@ public final class LandCommand extends Command {
         }catch(RuntimeException failure){send(sender,"purchase.unavailable",failure.getMessage());return true;}
         send(sender,"command.usage");return true;
     }
-    private void send(CommandSender sender,String key,Object...args){sender.sendMessage(plugin.text(sender,key,args));}
+    private boolean facilityCommand(CommandSender sender,String[] args){
+        if(!(sender instanceof Player player)||!sender.hasPermission("tokaland.admin")){send(sender,"command.denied");return true;}
+        if(args.length<2||args.length>3){send(sender,"command.usage");return true;}
+        try{
+            String type=args[1].toLowerCase(Locale.ROOT),name=args.length==3?args[2]:null;
+            plugin.facilities().save(player,type,name).whenComplete((status,error)->plugin.getServer().getScheduler().scheduleTask(plugin,()->{
+                if(error!=null)send(sender,"purchase.unavailable",error.getClass().getSimpleName());
+                else send(sender,status.equals("CREATED")?"facility.created":"facility.extended",name==null?type:name,type);
+            }));
+        }catch(IllegalArgumentException unknown){
+            if("UNKNOWN_FACILITY_TYPE".equals(unknown.getMessage()))send(sender,"facility.unknownType",String.join(", ",plugin.facilities().types().names()));
+            else send(sender,"purchase.unavailable",unknown.getMessage());
+        }catch(IllegalStateException failure){send(sender,"purchase.unavailable",failure.getMessage());}
+        return true;
+    }
+    private void send(CommandSender sender,String key,Object...args){sender.sendMessage(plugin.texts().text(sender,key,args));}
     private boolean manage(CommandSender sender,String action,String[] args){
         if(!(sender instanceof Player player)||!sender.hasPermission("tokaland.use")){send(sender,"command.denied");return true;}
         try{
@@ -114,9 +133,9 @@ public final class LandCommand extends Command {
                 if(args.length<required||args.length>required+1){send(sender,"command.usage");return true;}
                 if(args.length==required+1)target=args[required];
             }else{if(args.length<2||args.length>3){send(sender,"command.usage");return true;}if(args.length==3)target=args[2];}
-            LandClaim before=ClaimTargets.resolve(plugin.localPlayerClaims(player),target);plugin.checkManagement(player,before);
+            LandClaim before=ClaimTargets.resolve(plugin.management().claimsAround(player),target);plugin.management().check(player,before);
             if(action.equals("del")){
-                plugin.sellClaim(player,before).whenComplete((result,error)->plugin.getServer().getScheduler().scheduleTask(plugin,()->{
+                plugin.trading().sell(player,before).whenComplete((result,error)->plugin.getServer().getScheduler().scheduleTask(plugin,()->{
                     if(error!=null)send(sender,"purchase.unavailable",error.getClass().getSimpleName());
                     else send(sender,"management.saleResult",result.status(),result.operation(),result.detail());
                 }));send(sender,"management.saleStarted");return true;
@@ -124,27 +143,27 @@ public final class LandCommand extends Command {
             LandClaim after;
             switch(action){
                 case "rename" -> after=ClaimEdits.rename(before,args[1]);
-                case "give" -> {UUID person=plugin.resolvePlayer(args[1]);after=ClaimEdits.owner(before,person,plugin.playerName(person));}
+                case "give" -> {UUID person=plugin.management().resolvePlayer(args[1]);after=ClaimEdits.owner(before,person,plugin.management().playerName(person));}
                 case "type" -> after=ClaimEdits.type(before,args[1].toLowerCase(Locale.ROOT));
                 case "tpl" -> {var at=player.getLocation();after=ClaimEdits.teleport(before,new dev.toka.land.model.ClaimDetails.TeleportPoint(at.getLevel().getFolderName(),at.x,at.y,at.z,(float)at.yaw,(float)at.pitch));}
                 case "group","grp" -> {
                     String mode=args[1].toLowerCase(Locale.ROOT);
                     if(mode.equals("list")){
                         send(sender,"management.groupHeader",before.id(),before.name());
-                        before.accessGrants().stream().map(g->g.subject()).distinct().forEach(subject->send(sender,"management.member",subject.type(),subject.type()==AccessSubject.Type.PLAYER_UUID?plugin.playerName(UUID.fromString(subject.id())):subject.id(),subject.id()));
+                        before.accessGrants().stream().map(g->g.subject()).distinct().forEach(subject->send(sender,"management.member",subject.type(),subject.type()==AccessSubject.Type.PLAYER_UUID?plugin.management().playerName(UUID.fromString(subject.id())):subject.id(),subject.id()));
                         return true;
                     }
                     if(!Set.of("add","del").contains(mode))throw new IllegalArgumentException("INVALID_GROUP_ACTION");
                     List<AccessSubject> legacy=before.accessGrants().stream().map(g->g.subject()).filter(s->s.type()==AccessSubject.Type.LEGACY_NAME&&s.id().equalsIgnoreCase(args[2])).distinct().toList();
                     UUID resolved=null;
-                    try{resolved=plugin.resolvePlayer(args[2]);}catch(IllegalArgumentException unresolved){if(mode.equals("add")||legacy.isEmpty())throw unresolved;}
+                    try{resolved=plugin.management().resolvePlayer(args[2]);}catch(IllegalArgumentException unresolved){if(mode.equals("add")||legacy.isEmpty())throw unresolved;}
                     after=before;
                     if(resolved!=null)after=ClaimEdits.member(after,AccessSubject.player(resolved),mode.equals("add"));
                     if(mode.equals("del"))for(var subject:legacy)after=ClaimEdits.member(after,subject,false);
                 }
                 default -> throw new IllegalArgumentException("UNKNOWN_ACTION");
             }
-            plugin.editClaim(player,before,after).whenComplete((revision,error)->plugin.getServer().getScheduler().scheduleTask(plugin,()->{
+            plugin.management().edit(player,before,after).whenComplete((revision,error)->plugin.getServer().getScheduler().scheduleTask(plugin,()->{
                 if(error==null)send(sender,"management.saved",before.id());
                 else {Throwable cause=error;while(cause.getCause()!=null)cause=cause.getCause();send(sender,"purchase.unavailable",cause.getMessage());}
             }));

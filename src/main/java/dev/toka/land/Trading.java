@@ -1,0 +1,132 @@
+package dev.toka.land;
+
+import cn.nukkit.Player;
+import cn.nukkit.event.EventHandler;
+import cn.nukkit.event.Listener;
+import cn.nukkit.event.plugin.PluginDisableEvent;
+import cn.nukkit.plugin.Plugin;
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import dev.toka.land.model.*;
+import dev.toka.land.protection.SelectionToolListener;
+import dev.toka.land.purchase.EconomyLedger;
+import dev.toka.land.purchase.LandPricing;
+import dev.toka.land.purchase.PurchaseCoordinator;
+import dev.toka.land.purchase.SaleCoordinator;
+import dev.toka.storage.DocumentStore;
+import java.io.IOException;
+import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+/**
+ * Buying and selling land: price from {@link LandPricing}, discounts and region rules from the registered
+ * provider, payment through tokaEconomy, and recovery of unfinished transactions.
+ */
+public final class Trading implements Listener, AutoCloseable {
+    private static final Gson GSON = new Gson();
+    private final Main plugin;
+    private final PurchaseCoordinator purchases;
+    private final SaleCoordinator sales;
+    private final LandPricing pricing;
+    private volatile EconomyLedger ledger;
+    private Plugin economy;
+    private final AtomicBoolean recovering = new AtomicBoolean();
+
+    Trading(Main plugin, LandService lands, DocumentStore store) throws IOException {
+        this.plugin = plugin;
+        var config = plugin.getConfig();
+        this.pricing = new LandPricing(config.getString("pricing.currency", "money"), config.getDouble("pricing.per-block", 6.3),
+                config.getDouble("pricing.per-block-flat", 73.1), config.getDouble("pricing.refund-rate", 0.7));
+        this.purchases = new PurchaseCoordinator(lands, store, () -> ledger);
+        this.sales = new SaleCoordinator(lands, store, () -> ledger);
+    }
+
+    public boolean hasPending() { return purchases.hasPending() || sales.hasPending(); }
+
+    public boolean hasPending(UUID claimId) { return purchases.hasPending(claimId) || sales.hasPending(claimId); }
+
+    /** Asks the region provider whether the point may be selected, and whether the area is priced flat. */
+    public boolean ignoreHeight(Player player, SelectionToolListener.Point point) {
+        if (!Main.ownsLand() || plugin.maintenanceLocked()) throw new IllegalStateException("LAND_NOT_ACTIVE");
+        if (!player.hasPermission("tokaland.admin") && plugin.findAllAt(player.getLevel().getFolderName(), player.getFloorX(),
+                player.getFloorY(), player.getFloorZ()).stream().anyMatch(c -> c.kind() == ClaimKind.PLAYER))
+            throw new IllegalStateException("SELECTION_INSIDE_LAND");
+        JsonObject request = new JsonObject();
+        request.addProperty("action", "SELECT");
+        request.add("point", GSON.toJsonTree(point));
+        return plugin.providers().ask(player, request).get("ignoreHeight").getAsBoolean();
+    }
+
+    public CompletableFuture<PurchaseCoordinator.Outcome> purchase(Player player, String name) {
+        plugin.requirePrimaryThread();
+        if (!Main.ownsLand() || plugin.maintenanceLocked()) throw new IllegalStateException("LAND_NOT_ACTIVE");
+        if (ReservedNames.is(name)) throw new IllegalArgumentException("RESERVED_NAME");
+        var tool = plugin.selectionTool();
+        var draft = tool == null ? null : tool.get(player.getUniqueId());
+        if (draft == null) throw new IllegalStateException("SELECTION_REQUIRED");
+        var part = draft.geometry();
+        if (draft.teleport() == null) throw new IllegalStateException("TELEPORT_REQUIRED");
+        UUID owner = player.getUniqueId();
+        JsonObject request = new JsonObject();
+        request.addProperty("action", "ADJUST");
+        request.add("first", GSON.toJsonTree(draft.first()));
+        request.add("second", GSON.toJsonTree(draft.second()));
+        request.addProperty("ignoreHeight", draft.ignoreHeight());
+        request.addProperty("ownedCount", plugin.index().ownedBy(owner).size());
+        JsonObject adjustment = plugin.providers().ask(player, request);
+        long amount = pricing.quote(part, adjustment.get("offer").getAsDouble(), adjustment.get("tax").getAsDouble());
+        LandClaim claim = new LandClaim(UUID.randomUUID(), name, ClaimKind.PLAYER, "land", owner, null, false, false, List.of(part), List.of(),
+                AccessPolicy.privateDefault(), Map.of(), null, player.getName(), new ClaimDetails(owner, player.getName(), draft.teleport(), true));
+        return purchases.purchase(claim, pricing.currency(), amount);
+    }
+
+    /** Deleting refunds only the claim's creator, and only from the claim's geometry. */
+    public CompletableFuture<PurchaseCoordinator.Outcome> sell(Player player, LandClaim claim) {
+        UUID creator = claim.details().creatorId();
+        String creatorName = claim.details().creatorName();
+        if (creator == null && creatorName != null && !creatorName.isBlank()) throw new IllegalStateException("CREATOR_IDENTITY_UNCONFIRMED");
+        long amount = player.getUniqueId().equals(creator) ? pricing.refund(claim.selections()) : 0;
+        return sales.sell(claim, player.getUniqueId(), pricing.currency(), amount);
+    }
+
+    /** Called periodically: reconnects tokaEconomy after a reload and finishes interrupted transactions. */
+    public void maintain() {
+        connectEconomy();
+        if (!Main.ownsLand() || !recovering.compareAndSet(false, true)) return;
+        var buying = purchases.recover();
+        var selling = sales.recover();
+        CompletableFuture.allOf(buying, selling).whenComplete((ignored, failure) -> {
+            recovering.set(false);
+            if (failure != null) { plugin.getLogger().warning("領地交易恢復未完成：" + failure.getClass().getSimpleName()); return; }
+            for (var result : buying.join()) if (!result.status().equals("PENDING")) plugin.getLogger().info("購地交易恢復：" + result.operation() + " " + result.status());
+            for (var result : selling.join()) if (!result.status().equals("PENDING")) plugin.getLogger().info("售地交易恢復：" + result.operation() + " " + result.status());
+        });
+    }
+
+    public void connectEconomy() {
+        Plugin current = plugin.getServer().getPluginManager().getPlugin("tokaEconomy");
+        if (current == economy && current != null && current.isEnabled()) return;
+        disconnect();
+        if (current == null || !current.isEnabled()) return;
+        try { ledger = new EconomyLedger(current); economy = current; }
+        catch (ReflectiveOperationException | LinkageError failure) { plugin.getLogger().warning("購地交易 API 尚未就緒：" + failure.getClass().getSimpleName()); }
+    }
+
+    private void disconnect() {
+        if (ledger != null) ledger.disconnect();
+        ledger = null;
+        economy = null;
+    }
+
+    @EventHandler public void onPluginDisabled(PluginDisableEvent event) {
+        if (event.getPlugin() == economy) disconnect();
+    }
+
+    /** Closes both ledgers; a transaction still saving keeps the storage lock. */
+    @Override public void close() throws IOException {
+        disconnect();
+        try { sales.close(); } catch (IOException error) { plugin.getLogger().error("售地交易仍在保存，保留儲存鎖。", error); throw error; }
+        try { purchases.close(); } catch (IOException error) { plugin.getLogger().error("購地交易仍在保存，保留儲存鎖。", error); throw error; }
+    }
+}

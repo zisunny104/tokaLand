@@ -35,6 +35,11 @@ purchase:
   started: "§b[Land] Processing the purchase. Please wait for its result."
   result: "§b[Land] Transaction: ${0}; ID: ${1}; ${2}"
   unavailable: "§e[Land] Not completed: ${0}"
+facility:
+  help: "§e/land fac <type> [name] §7— Create a facility claim from the selection; same name adds a part (admin)"
+  created: "§a[Facility] Created ${0} (${1})."
+  extended: "§a[Facility] Added a part to ${0}."
+  unknownType: "§e[Facility] Unknown type. Available: ${0}"
 selection:
   first: "§aSelection point 1: ${0} (${1}, ${2}, ${3})"
   second: "§aSelection point 2: ${0} (${1}, ${2}, ${3})"

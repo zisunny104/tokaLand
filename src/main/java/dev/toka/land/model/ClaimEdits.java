@@ -10,7 +10,7 @@ public final class ClaimEdits {
                 c.selections(),grants,c.accessPolicy(),c.localizedNames(),owner==null?c.legacyOwnerName():null,ownerName,details);
     }
     public static LandClaim rename(LandClaim c,String name){
-        if(name==null||name.isBlank()||Set.of("help","list","set","del","edit").contains(name.strip().replaceAll("_+$","").toLowerCase(Locale.ROOT)))
+        if(ReservedNames.is(name))
             throw new IllegalArgumentException("RESERVED_NAME");
         return copy(c,name,c.type(),c.ownerId(),c.ownerNameSnapshot(),c.accessGrants(),c.details());
     }
@@ -32,5 +32,10 @@ public final class ClaimEdits {
                 .filter(g->!g.subject().equals(subject)||!permissions.contains(g.permission())).toList());
         if(add)for(ClaimPermission action:permissions)grants.add(new AccessGrant(subject,action,AccessDecision.ALLOW));
         return copy(c,c.name(),c.type(),c.ownerId(),c.ownerNameSnapshot(),grants,c.details());
+    }
+    public static LandClaim addSelection(LandClaim c,LandSelection part){
+        List<LandSelection> parts=new ArrayList<>(c.selections());parts.add(part);
+        return new LandClaim(c.id(),c.name(),c.kind(),c.type(),c.ownerId(),c.parentClaimId(),c.inheritOwner(),c.inheritPermissions(),
+                parts,c.accessGrants(),c.accessPolicy(),c.localizedNames(),c.legacyOwnerName(),c.ownerNameSnapshot(),c.details());
     }
 }

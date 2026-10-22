@@ -25,7 +25,7 @@ public final class LandService implements AutoCloseable {
                 throw new ClaimConflict("ID_CONFLICT");
             }
             if(existing.name().equals(claim.name()))throw new ClaimConflict("NAME_CONFLICT");
-            if(existing.kind()==ClaimKind.PLAYER&&overlaps(existing,claim))throw new ClaimConflict("SELECTION_CONFLICT");
+            if(existing.kind()==ClaimKind.PLAYER&&claim.kind()==ClaimKind.PLAYER&&overlaps(existing,claim))throw new ClaimConflict("SELECTION_CONFLICT");
         }
     }
     public static boolean overlaps(LandClaim a,LandClaim b){
@@ -54,11 +54,6 @@ public final class LandService implements AutoCloseable {
             catch(ConcurrentModificationException error){throw error;}
             catch(Exception error){healthy=false;throw new CompletionException(error);}
         },writer);
-    }
-    public CompletableFuture<String> update(String expectedRevision,LandClaim claim){
-        var current=snapshot;if(!current.revision().equals(expectedRevision))return CompletableFuture.failedFuture(new ConcurrentModificationException("Land dataset changed"));
-        List<LandClaim> all=new ArrayList<>(current.index().all());all.removeIf(c->c.id().equals(claim.id()));all.add(claim);
-        return replace(expectedRevision,all);
     }
     /** Compare the actual edited record, so an unrelated update does not overwrite or invalidate it. */
     public CompletableFuture<String> edit(LandClaim before,LandClaim after){

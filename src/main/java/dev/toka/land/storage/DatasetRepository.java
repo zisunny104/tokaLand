@@ -13,14 +13,20 @@ public final class DatasetRepository {
     private static final Gson GSON=new GsonBuilder().disableHtmlEscaping().serializeNulls().create();
     private final DocumentStore store;
     public record Snapshot(String revision, LandIndex index){}
+    /** Last state this instance read or committed; null forces the next write to reload from storage. */
+    private Snapshot current;
+    private Map<String,String> currentKeys=Map.of();
     public DatasetRepository(DocumentStore store){this.store=Objects.requireNonNull(store);}
 
-    public Snapshot load() throws IOException {
+    public synchronized Snapshot load() throws IOException {
+        current=null;
         var manifest=store.load("dataset");
         if(manifest.isEmpty()){
             // Native 0.1 prototype records. No zero SQL or legacy plugin format is read here.
             var claims=new LandRepository(store).loadAll();
-            return new Snapshot(claims.isEmpty()?"EMPTY":digest(GSON.toJsonTree(claims)),new LandIndex(claims));
+            current=new Snapshot(claims.isEmpty()?"EMPTY":digest(GSON.toJsonTree(claims)),new LandIndex(claims));
+            currentKeys=Map.of();
+            return current;
         }
         JsonObject document=manifest.get();
         try{requireSupportedFormat(document.get("format"));}
@@ -36,18 +42,27 @@ public final class DatasetRepository {
             if(!entry.getKey().equals(claim.id().toString())||!key.equals(contentKey(claim,data)))throw new IOException("Claim document checksum mismatch");
             claims.add(claim);
         }
-        return new Snapshot(revision,new LandIndex(claims));
+        Map<String,String> keys=new HashMap<>();
+        refs.entrySet().forEach(entry->keys.put(entry.getKey(),entry.getValue().getAsString()));
+        currentKeys=keys;
+        return current=new Snapshot(revision,new LandIndex(claims));
     }
 
-    /** Validate and read back every candidate before switching the active manifest. */
+    /**
+     * Commits a new dataset. Unchanged claims keep their stored document, so a write costs time proportional
+     * to the edited claims plus one pass over the rest; only new documents and the manifest are read back.
+     */
     public synchronized Snapshot replace(String expectedRevision,Collection<LandClaim> input) throws IOException {
-        Snapshot before=load();
+        Snapshot before=current!=null?current:load();
         if(!Objects.equals(expectedRevision,before.revision()))throw new ConcurrentModificationException("Land dataset changed; preview again");
         LandIndex candidate=new LandIndex(input);
+        current=null; // Any failure below leaves storage authoritative; the next call reloads it.
         JsonObject refs=new JsonObject();Map<String,JsonObject> writes=new TreeMap<>();
         for(LandClaim claim:candidate.all().stream().sorted(Comparator.comparing(c->c.id().toString())).toList()){
+            String id=claim.id().toString();String kept=currentKeys.get(id);
+            if(kept!=null&&before.index().get(claim.id()).filter(claim::equals).isPresent()){refs.addProperty(id,kept);continue;}
             JsonObject data=encode(claim);String key=contentKey(claim,data);
-            refs.addProperty(claim.id().toString(),key);
+            refs.addProperty(id,key);
             Optional<JsonObject> existing=store.load(key);
             if(existing.isEmpty())writes.put(key,data);
             else if(!existing.get().equals(data))throw new IOException("Content-addressed document collision");
@@ -58,9 +73,10 @@ public final class DatasetRepository {
         var old=store.load("dataset");if(old.isPresent())store.save("dataset.previous",old.get());
         store.save("dataset",manifest);
         if(!store.load("dataset").orElseThrow().equals(manifest))throw new IOException("Dataset manifest readback mismatch");
-        Snapshot after=load();
-        if(!new HashSet<>(after.index().all()).equals(new HashSet<>(candidate.all())))throw new IOException("Dataset readback mismatch");
-        return after;
+        Map<String,String> keys=new HashMap<>();
+        refs.entrySet().forEach(entry->keys.put(entry.getKey(),entry.getValue().getAsString()));
+        currentKeys=keys;
+        return current=new Snapshot(manifest.get("revision").getAsString(),candidate);
     }
 
     public static JsonObject encode(LandClaim claim){return GSON.toJsonTree(claim).getAsJsonObject();}

@@ -8,6 +8,7 @@ public final class LandIndex {
     private final Map<UUID, LandClaim> claims;
     private final Map<String, Map<Cell, Set<UUID>>> cells = new HashMap<>();
     private final Map<String, Set<UUID>> broadClaims = new HashMap<>();
+    private volatile Map<UUID, List<LandClaim>> byOwner;
 
     private record Cell(int x, int z) { }
 
@@ -34,6 +35,19 @@ public final class LandIndex {
                 .filter(claim -> claim.contains(world, x, y, z))
                 .sorted(Comparator.comparing(claim -> claim.id().toString()))
                 .toList();
+    }
+
+    /** Claims whose effective owner is the player, resolved once per immutable index. */
+    public List<LandClaim> ownedBy(UUID owner) {
+        Map<UUID, List<LandClaim>> map = byOwner;
+        if (map == null) {
+            Map<UUID, List<LandClaim>> built = new HashMap<>();
+            for (LandClaim claim : claims.values())
+                ClaimAccess.effectiveOwner(this, claim.id()).ifPresent(id -> built.computeIfAbsent(id, k -> new ArrayList<>()).add(claim));
+            built.replaceAll((k, v) -> List.copyOf(v));
+            byOwner = map = built;
+        }
+        return map.getOrDefault(owner, List.of());
     }
 
     public Optional<LandClaim> get(UUID id) { return Optional.ofNullable(claims.get(id)); }

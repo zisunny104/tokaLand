@@ -29,7 +29,7 @@ public final class PlayerProtectionListener implements Listener {
             var answer=JsonParser.parseString(Main.queryProtectionJson(player,target.getLevel().getFolderName(),
                 target.getFloorX(),target.getFloorY(),target.getFloorZ(),action.name())).getAsJsonObject();
             return new Decision(answer.get("status").getAsString().equals("ALLOW")&&answer.get("allowed").getAsBoolean(),answer.get("reason").getAsString());
-        },(player,reason)->{if(player!=null)player.sendMessage(plugin.text(player,"ui.denied",reason));});
+        },(player,reason)->{if(player!=null)player.sendMessage(plugin.texts().text(player,"ui.denied",reason));});
     }
     PlayerProtectionListener(BooleanSupplier active,Check check,BiConsumer<Player,String> denied){
         this(null,active,check,denied);
@@ -75,7 +75,7 @@ public final class PlayerProtectionListener implements Listener {
         }
         // Never infer an owner for mobs, offline shooters or unresolved projectile sources.
         if(plugin!=null&&plugin.getConfig().getBoolean("protection.entities.prevent-unattributed-damage",true)
-            &&plugin.protectedEnvironment(event.getEntity().getPosition()))event.setCancelled();
+            &&plugin.queries().protectedEnvironment(event.getEntity().getPosition()))event.setCancelled();
     }
     @EventHandler(ignoreCancelled=true)
     public void onFrameDrop(ItemFrameDropItemEvent event){
