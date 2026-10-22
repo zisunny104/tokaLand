@@ -12,7 +12,7 @@ public class LandRepositoryTest {
     @Rule public TemporaryFolder temporary = new TemporaryFolder();
     @Test public void prototypeFallbackCannotBypassStrictNativeDecode() throws Exception {
         var claim=new LandClaim(UUID.randomUUID(),"test",ClaimKind.PLAYER,"land",UUID.randomUUID(),null,false,true,
-            List.of(new LandSelection("world",0,0,0,10,10,10,false)),Map.of());
+            List.of(new LandSelection("world",0,0,0,10,10,10,false)),List.of(),AccessPolicy.privateDefault(),Map.of(),null,null,ClaimDetails.privateDefaults());
         try(var store=DocumentStore.open(new StoreConfig(Backend.JSON,temporary.newFolder().toPath(),1))){
             new LandRepository(store).save(claim);
             var key="claim."+claim.id();var doc=store.load(key).orElseThrow();
@@ -30,8 +30,8 @@ public class LandRepositoryTest {
                     false, true,
                     List.of(new LandSelection("world", -12, 5, -4, 18, 80, 9, true),
                             new LandSelection("world", 19, 5, -4, 20, 80, 9, true)),
-                    Map.of(member, Map.of(ClaimPermission.BUILD, AccessDecision.DENY)),
-                    Map.of("zh-TW","公用道路","en-US","Public road"),null,"Owner snapshot");
+                    List.of(new AccessGrant(AccessSubject.player(member),ClaimPermission.BUILD,AccessDecision.DENY)),
+                    AccessPolicy.privateDefault(),Map.of("zh-TW","公用道路","en-US","Public road"),null,"Owner snapshot",ClaimDetails.privateDefaults());
             try (DocumentStore store = DocumentStore.open(new StoreConfig(backend, directory, 1))) {
                 new LandRepository(store).save(expected);
             }

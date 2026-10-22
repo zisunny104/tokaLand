@@ -6,8 +6,8 @@
  * plugins will implement. Do not reference zero classes or legacy SQL here. Remove each zero adapter
  * after its replacement passes verification and the corresponding legacy entry point is disabled.
  *
- * TODO(migration): Expose stable claim-ID teleport targets and access checks to tokaPortal;
- * tokaSigns must use that same Portal execution path. Keep registration, cooldown, and transport
- * outside Land's domain model. Legacy target-name resolution and conversion stay in zero.
+ * tokaPortal reads owner-only, stable-ID teleport targets through Main.queryTeleportTargetsJson
+ * and Main.queryTeleportTargetJson. It remains responsible for events, cooldown, and transport;
+ * tokaSigns should call that same Portal execution path. Legacy conversion stays in zero.
  */
 package dev.toka.land.api;

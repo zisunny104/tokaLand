@@ -9,12 +9,17 @@ public class LandIndexTest {
                                    boolean inheritOwner, boolean inheritPermissions,
                                    java.util.Map<UUID, java.util.Map<ClaimPermission, AccessDecision>> overrides,
                                    LandSelection... parts) {
+        List<AccessGrant> grants = new ArrayList<>();
+        overrides.forEach((subject, entries) -> entries.forEach((permission, decision) ->
+                grants.add(new AccessGrant(AccessSubject.player(subject), permission, decision))));
         return new LandClaim(id, name, ClaimKind.PLAYER, "land", owner, parent,
-                inheritOwner, inheritPermissions, List.of(parts), overrides);
+                inheritOwner, inheritPermissions, List.of(parts), grants, AccessPolicy.privateDefault(),
+                Map.of(), null, null, ClaimDetails.privateDefaults());
     }
     private static LandClaim claim(ClaimKind kind, String type, LandSelection... parts) {
         return new LandClaim(UUID.randomUUID(), "test", kind, type, UUID.randomUUID(), null,
-                false, true, List.of(parts), java.util.Map.of());
+                false, true, List.of(parts), List.of(), AccessPolicy.privateDefault(),
+                Map.of(), null, null, ClaimDetails.privateDefaults());
     }
 
     @Test public void multiplePartsOfOneClaimFormAnIrregularShape() {

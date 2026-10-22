@@ -1,10 +1,13 @@
 name: tokaLand
 main: dev.toka.land.Main
-version: "0.1.3"
+version: "0.1.5"
 api: ["1.0.4"]
 load: POSTWORLD
-softdepend: [tokaDisplay, tokaProfiles, tokaWorlds]
+softdepend: [tokaDisplay, tokaProfiles, tokaWorlds, tokaEconomy]
 permissions:
+  tokaland.use:
+    description: 使用領地選區與建地指令，仍受計價及領地規則檢查
+    default: true
   tokaland.admin:
     description: 管理領地與協助擁有者編輯；不自動繞過 LOCK
     default: op

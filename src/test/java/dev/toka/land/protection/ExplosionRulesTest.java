@@ -8,7 +8,8 @@ import static org.junit.Assert.*;
 public class ExplosionRulesTest {
     private LandClaim claim(String world,int min,int max,boolean flat){
         return new LandClaim(UUID.randomUUID(),"land",ClaimKind.PLAYER,"land",UUID.randomUUID(),null,false,false,
-            List.of(new LandSelection(world,min,50,0,max,70,10,flat)),Map.of());
+            List.of(new LandSelection(world,min,50,0,max,70,10,flat)),List.of(),AccessPolicy.privateDefault(),
+            Map.of(),null,null,ClaimDetails.privateDefaults());
     }
     private final ActorAttribution.Result unknown=new ActorAttribution.Result(null,ActorAttribution.Reason.MISSING_SOURCE,1);
     @Test public void overlapIsNotLimitedToTheExplosionCenterAndReturnsEveryClaim(){

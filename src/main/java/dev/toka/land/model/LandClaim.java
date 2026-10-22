@@ -7,26 +7,15 @@ public record LandClaim(UUID id, String name, ClaimKind kind, String type,
                         UUID ownerId, UUID parentClaimId,
                         boolean inheritOwner, boolean inheritPermissions,
                         List<LandSelection> selections,
-                        Map<UUID, Map<ClaimPermission, AccessDecision>> accessOverrides,
+                        List<AccessGrant> accessGrants, AccessPolicy accessPolicy,
                         Map<String,String> localizedNames, String legacyOwnerName, String ownerNameSnapshot,
                         ClaimDetails details) {
-    public LandClaim(UUID id, String name, ClaimKind kind, String type,
-                     UUID ownerId, UUID parentClaimId, boolean inheritOwner, boolean inheritPermissions,
-                     List<LandSelection> selections, Map<UUID,Map<ClaimPermission,AccessDecision>> overrides,
-                     Map<String,String> localizedNames,String legacyOwnerName,String ownerNameSnapshot) {
-        this(id,name,kind,type,ownerId,parentClaimId,inheritOwner,inheritPermissions,selections,overrides,
-                localizedNames,legacyOwnerName,ownerNameSnapshot,ClaimDetails.privateDefaults());
-    }
-    public LandClaim(UUID id, String name, ClaimKind kind, String type,
-                     UUID ownerId, UUID parentClaimId, boolean inheritOwner, boolean inheritPermissions,
-                     List<LandSelection> selections, Map<UUID,Map<ClaimPermission,AccessDecision>> overrides) {
-        this(id,name,kind,type,ownerId,parentClaimId,inheritOwner,inheritPermissions,selections,overrides,Map.of(),null,null);
-    }
     public LandClaim {
         Objects.requireNonNull(id, "id");
         if (name == null || name.isBlank()) throw new IllegalArgumentException("name is required");
         Objects.requireNonNull(kind, "kind");
         details=details==null?ClaimDetails.privateDefaults():details;
+        accessPolicy=accessPolicy==null?AccessPolicy.privateDefault():accessPolicy;
         if(details.teleport()!=null && selections!=null && !selections.isEmpty()) {
             var point=details.teleport();
             if(selections.stream().noneMatch(part->part.contains(point.world(),(int)Math.floor(point.x()),(int)Math.floor(point.y()),(int)Math.floor(point.z()))))
@@ -50,10 +39,13 @@ public record LandClaim(UUID id, String name, ClaimKind kind, String type,
         if (selections.stream().anyMatch(part -> !world.equals(part.world())))
             throw new IllegalArgumentException("all selections in one claim must use the same world");
         if (id.equals(parentClaimId)) throw new IllegalArgumentException("a claim cannot parent itself");
-        Map<UUID, Map<ClaimPermission, AccessDecision>> copy = new HashMap<>();
-        if (accessOverrides != null) accessOverrides.forEach((subject, entries) ->
-                copy.put(Objects.requireNonNull(subject), Map.copyOf(entries)));
-        accessOverrides = Collections.unmodifiableMap(copy);
+        accessGrants=List.copyOf(Objects.requireNonNull(accessGrants,"accessGrants"));
+        Set<String> grantKeys=new HashSet<>();
+        for(AccessGrant grant:accessGrants){
+            Objects.requireNonNull(grant,"access grant");
+            if(!grantKeys.add(grant.subject()+"/"+grant.permission()))
+                throw new IllegalArgumentException("duplicate subject/action grant");
+        }
     }
 
     public String world() { return selections.getFirst().world(); }

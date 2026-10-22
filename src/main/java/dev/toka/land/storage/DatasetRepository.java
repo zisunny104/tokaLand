@@ -23,7 +23,7 @@ public final class DatasetRepository {
             return new Snapshot(claims.isEmpty()?"EMPTY":digest(GSON.toJsonTree(claims)),new LandIndex(claims));
         }
         JsonObject document=manifest.get();
-        try{requireFormatOne(document.get("format"));}
+        try{requireSupportedFormat(document.get("format"));}
         catch(IllegalArgumentException e){throw new IOException("Unsupported Land dataset format",e);}
         JsonObject refs=document.getAsJsonObject("claims");
         String revision=digest(refs);
@@ -64,15 +64,54 @@ public final class DatasetRepository {
     }
 
     public static JsonObject encode(LandClaim claim){return GSON.toJsonTree(claim).getAsJsonObject();}
-    public static void requireFormatOne(JsonElement format){
+    /** Reads the shared format 1 model and upgrades unversioned prototype records in memory. */
+    public static LandClaim decode(JsonObject data){
+        if(data.has("accessOverrides")||(data.has("details")&&data.get("details").isJsonObject()
+                &&data.getAsJsonObject("details").has("protection")))return decodePrototype(data);
+        validateValue(data,LandClaim.class,"claim");
+        return Objects.requireNonNull(GSON.fromJson(data,LandClaim.class));
+    }
+    private static LandClaim decodePrototype(JsonObject data){
+        validateValue(data,PrototypeClaim.class,"claim");
+        PrototypeClaim old=Objects.requireNonNull(GSON.fromJson(data,PrototypeClaim.class));
+        List<AccessGrant> grants=new ArrayList<>();
+        if(old.accessOverrides()!=null)old.accessOverrides().forEach((subject,entries)->entries.forEach((permission,decision)->
+                grants.add(new AccessGrant(AccessSubject.player(subject),permission,decision))));
+        if(old.details()!=null&&old.details().pendingMembers()!=null)for(String name:old.details().pendingMembers())
+            for(ClaimPermission permission:ClaimPermission.values())grants.add(new AccessGrant(AccessSubject.legacyName(name),permission,AccessDecision.ALLOW));
+        var previous=old.details()==null?null:old.details().protection();
+        AccessPolicy.Mode mode=previous==null?AccessPolicy.Mode.PRIVATE:switch(previous){
+            case PRIVATE->AccessPolicy.Mode.PRIVATE;
+            case OPEN->AccessPolicy.Mode.OPEN;
+            case PROTECT,LOCK->AccessPolicy.Mode.PROTECT;
+        };
+        AccessPolicy policy=new AccessPolicy(mode,previous==PrototypeProtection.LOCK);
+        var oldDetails=old.details();
+        ClaimDetails details=oldDetails==null?ClaimDetails.privateDefaults():
+                new ClaimDetails(oldDetails.creatorId(),oldDetails.creatorName(),oldDetails.teleport(),oldDetails.publicTeleport());
+        return new LandClaim(old.id(),old.name(),old.kind(),old.type(),old.ownerId(),old.parentClaimId(),old.inheritOwner(),
+                old.inheritPermissions(),old.selections(),grants,policy,old.localizedNames(),old.legacyOwnerName(),
+                old.ownerNameSnapshot(),details);
+    }
+    private enum PrototypeProtection { PRIVATE, OPEN, PROTECT, LOCK }
+    private record PrototypeDetails(UUID creatorId,String creatorName,ClaimDetails.TeleportPoint teleport,
+                                     PrototypeProtection protection,Set<String> pendingMembers,boolean publicTeleport){}
+    private record PrototypeClaim(UUID id,String name,ClaimKind kind,String type,UUID ownerId,UUID parentClaimId,
+                                  boolean inheritOwner,boolean inheritPermissions,List<LandSelection> selections,
+                                  Map<UUID,Map<ClaimPermission,AccessDecision>> accessOverrides,
+                                  Map<String,String> localizedNames,String legacyOwnerName,String ownerNameSnapshot,
+                                  PrototypeDetails details){}
+    public static void requireSupportedFormat(JsonElement format){
         if(format==null||!format.isJsonPrimitive()||!format.getAsJsonPrimitive().isNumber())
             throw new IllegalArgumentException("Dataset format must be integer 1");
         try{if(format.getAsBigDecimal().intValueExact()!=1)throw new IllegalArgumentException("Unsupported dataset format");}
         catch(ArithmeticException e){throw new IllegalArgumentException("Dataset format must be integer 1",e);}
     }
-    public static LandClaim decode(JsonObject data){
-        validateValue(data,LandClaim.class,"claim");
-        return Objects.requireNonNull(GSON.fromJson(data,LandClaim.class));
+    public static void requireFormatOne(JsonElement format){
+        if(format==null||!format.isJsonPrimitive()||!format.getAsJsonPrimitive().isNumber())
+            throw new IllegalArgumentException("Dataset format must be integer 1");
+        try{if(format.getAsBigDecimal().intValueExact()!=1)throw new IllegalArgumentException("Unsupported dataset format");}
+        catch(ArithmeticException e){throw new IllegalArgumentException("Dataset format must be integer 1",e);}
     }
     /** Gson otherwise silently drops nested fields and truncates fractional integer coordinates. */
     private static void validateValue(JsonElement value,java.lang.reflect.Type type,String path){

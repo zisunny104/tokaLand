@@ -43,7 +43,7 @@ public record ExplosionRules(Mode mode,boolean environmentProtection,int attribu
             }
         }
         List<LandClaim> effectiveHits=hits.stream().filter(c->!(overriddenAncestors.contains(c.id())
-            &&c.details().protection()==ClaimDetails.ProtectionMode.PRIVATE)).toList();
+            &&c.accessPolicy().mode()!=dev.toka.land.model.AccessPolicy.Mode.OPEN&&!c.accessPolicy().locked())).toList();
         List<UUID> denied=effectiveHits.stream().filter(c->actor.confirmed()?!playerAuthorized.test(c):environmentProtection).map(LandClaim::id).toList();
         return new Decision(!denied.isEmpty(),denied.isEmpty()?"ALLOW":actor.confirmed()?"PLAYER_DENIED":"ENVIRONMENT_PROTECTED",hits.stream().map(LandClaim::id).toList(),denied);
     }

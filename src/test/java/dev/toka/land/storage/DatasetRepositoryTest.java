@@ -11,7 +11,7 @@ import static org.junit.Assert.*;
 
 public class DatasetRepositoryTest {
     @Rule public TemporaryFolder temporary=new TemporaryFolder();
-    private LandClaim claim(String name){return new LandClaim(UUID.randomUUID(),name,ClaimKind.PLAYER,"land",UUID.randomUUID(),null,false,true,List.of(new LandSelection("world",0,0,0,5,20,5,false)),Map.of());}
+    private LandClaim claim(String name){return new LandClaim(UUID.randomUUID(),name,ClaimKind.PLAYER,"land",UUID.randomUUID(),null,false,true,List.of(new LandSelection("world",0,0,0,5,20,5,false)),List.of(),AccessPolicy.privateDefault(),Map.of(),null,null,ClaimDetails.privateDefaults());}
     @Test public void nestedUnknownFieldsAndLossyPrimitiveValuesAreRejected(){
         for(String field:List.of("minX","minY","minZ","maxX","maxY","maxZ")){
             var data=DatasetRepository.encode(claim("test"));data.getAsJsonArray("selections").get(0).getAsJsonObject().addProperty(field,1.5);
@@ -27,10 +27,49 @@ public class DatasetRepositoryTest {
     }
     private void rejects(JsonObject data){try{DatasetRepository.decode(data);fail("malformed data accepted: "+data);}catch(IllegalArgumentException expected){}}
     @Test public void formatRejectsTruncationOverflowAndStringCoercion(){
-        for(String value:List.of("1.5","4294967297","\"1\"","true","null","{}","[]","2")){
+        for(String value:List.of("1.5","4294967297","\"1\"","true","null","{}","[]","0","3")){
             try{DatasetRepository.requireFormatOne(com.google.gson.JsonParser.parseString(value));fail(value);}catch(IllegalArgumentException expected){}
         }
         DatasetRepository.requireFormatOne(com.google.gson.JsonParser.parseString("1"));
+        try{DatasetRepository.requireSupportedFormat(com.google.gson.JsonParser.parseString("2"));fail("unreleased format number must not be accepted");}catch(IllegalArgumentException expected){}
+    }
+    @Test public void prototypeFieldsUpgradeToSharedAclAndIndependentLock() {
+        var source=claim("old");var old=DatasetRepository.encode(source);
+        old.remove("accessGrants");old.remove("accessPolicy");
+        var overrides=new JsonObject();var member=UUID.randomUUID();var memberActions=new JsonObject();
+        memberActions.addProperty("BUILD","ALLOW");overrides.add(member.toString(),memberActions);old.add("accessOverrides",overrides);
+        var details=old.getAsJsonObject("details");details.addProperty("protection","LOCK");
+        var names=new com.google.gson.JsonArray();names.add("Unresolved");details.add("pendingMembers",names);
+        LandClaim upgraded=DatasetRepository.decode(old);
+        assertEquals(new AccessPolicy(AccessPolicy.Mode.PROTECT,true),upgraded.accessPolicy());
+        assertTrue(upgraded.accessGrants().contains(new AccessGrant(AccessSubject.player(member),ClaimPermission.BUILD,AccessDecision.ALLOW)));
+        var legacy=new AccessGrant(AccessSubject.legacyName("Unresolved"),ClaimPermission.BUILD,AccessDecision.ALLOW);
+        assertTrue(upgraded.accessGrants().contains(legacy));
+        assertFalse(ClaimAccess.allows(new LandIndex(List.of(upgraded)),upgraded.id(),UUID.randomUUID(),ClaimPermission.BUILD,false,s->s.type()==AccessSubject.Type.LEGACY_NAME));
+    }
+    @Test public void oldManifestLoadsAndKeepsFormatOneOnCommit()throws Exception{
+        try(var store=DocumentStore.open(new StoreConfig(Backend.JSON,temporary.newFolder().toPath(),1))){
+            var source=claim("old-manifest");var old=DatasetRepository.encode(source);old.remove("accessGrants");old.remove("accessPolicy");
+            old.getAsJsonObject("details").addProperty("protection","OPEN");old.getAsJsonObject("details").add("pendingMembers",new com.google.gson.JsonArray());
+            String key="c."+source.id()+"."+DatasetRepository.digest(old);store.save(key,old);
+            var refs=new JsonObject();refs.addProperty(source.id().toString(),key);
+            var manifest=new JsonObject();manifest.addProperty("format",1);manifest.add("claims",refs);manifest.addProperty("revision",DatasetRepository.digest(refs));store.save("dataset",manifest);
+            var repository=new DatasetRepository(store);var loaded=repository.load();
+            assertEquals(AccessPolicy.Mode.OPEN,loaded.index().get(source.id()).orElseThrow().accessPolicy().mode());
+            assertEquals(1,store.load("dataset").orElseThrow().get("format").getAsInt());
+            var committed=repository.replace(loaded.revision(),loaded.index().all());
+            assertTrue(committed.index().get(source.id()).isPresent());
+            assertEquals(1,store.load("dataset").orElseThrow().get("format").getAsInt());
+        }
+    }
+    @Test public void oneFieldShapeSupportsPlayerPublicAndFacilityClaims() {
+        for(ClaimKind kind:ClaimKind.values()){
+            var claim=new LandClaim(UUID.randomUUID(),kind.name(),kind,"shared-type",null,null,false,true,
+                    List.of(new LandSelection("world",0,0,0,1,2,3,true)),List.of(),
+                    new AccessPolicy(AccessPolicy.Mode.OPEN,false),Map.of(),null,null,ClaimDetails.privateDefaults());
+            var encoded=DatasetRepository.encode(claim);var decoded=DatasetRepository.decode(encoded);
+            assertEquals(claim,decoded);assertTrue(encoded.has("accessGrants"));assertTrue(encoded.has("accessPolicy"));
+        }
     }
     @Test public void teleportCoordinatesCannotSaturateWhenConvertedToBlocks(){
         for(double outside:new double[]{1e100,-1e100,(double)Integer.MAX_VALUE+1,(double)Integer.MIN_VALUE-0.5}){

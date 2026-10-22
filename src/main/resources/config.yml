@@ -37,5 +37,5 @@ display:
 
 selection:
   enabled: true
-  # 可用 Nukkit Item 名稱或 ID:damage，例如 wooden_axe:0、271:0。
-  tool: wooden_axe:0
+  # 可用 Nukkit Item 名稱或 ID:damage；預設沿用 zero 的木鋤（290）。
+  tool: "290:0"

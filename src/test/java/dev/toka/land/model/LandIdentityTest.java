@@ -7,8 +7,8 @@ import static org.junit.Assert.*;
 public class LandIdentityTest {
     private LandClaim claim(UUID owner,String legacy) {
         return new LandClaim(UUID.randomUUID(),"預設名稱",ClaimKind.PLAYER,"land",owner,null,false,true,
-                List.of(new LandSelection("world",0,0,0,5,5,5,false)),Map.of(),
-                Map.of("zh-TW","小屋","en-US","Cabin"),legacy,"舊顯示名稱");
+                List.of(new LandSelection("world",0,0,0,5,5,5,false)),List.of(),AccessPolicy.privateDefault(),
+                Map.of("zh-TW","小屋","en-US","Cabin"),legacy,"舊顯示名稱",ClaimDetails.privateDefaults());
     }
     @Test public void displayNamesDoNotChangeTheOwnerIdentity() {
         UUID owner=UUID.randomUUID();LandClaim claim=claim(owner,null);
