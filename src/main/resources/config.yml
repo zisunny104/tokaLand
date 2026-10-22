@@ -2,7 +2,8 @@ language: zh-TW
 protection:
   explosions:
     # cancel-whole：波及需防護的領地時取消整次爆炸；disabled：不由 Land 攔截爆炸。
-    # 實體爆炸可由 prime force 算出傷害／擊退範圍；區塊來源爆炸仍缺核心範圍欄位。
+    # 範圍無法核實時取消整次爆炸，包含沒有 force 的區塊來源爆炸。
+    # 這可能取消領地外的床／重生錨爆炸；若要完全停用 Land 爆炸攔截，設定 mode: disabled。
     # 正式保護仍受 ownership.active 與程式待命閘門控制。
     mode: cancel-whole
     # 自然爆炸及無法確認玩家來源的 TNT，共用環境防護。

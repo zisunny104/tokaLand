@@ -73,7 +73,7 @@ public final class Main extends PluginBase implements Listener {
             getServer().getPluginManager().registerEvents(this, this);
             getServer().getPluginManager().registerEvents(new dev.toka.land.protection.PlayerProtectionListener(this), this);
             var explosionListener=new dev.toka.land.protection.ExplosionProtectionListener(
-                Main::ownsLand,this::cancelEntityExplosion,()->getServer().getTick(),
+                Main::ownsLand,this::cancelUnknownBlastRange,this::cancelEntityExplosion,()->getServer().getTick(),
                 line->getLogger().warning(line));
             getServer().getPluginManager().registerEvents(explosionListener,this);
             getServer().getScheduler().scheduleRepeatingTask(this,explosionListener::prune,20);
@@ -106,6 +106,7 @@ public final class Main extends PluginBase implements Listener {
     public static Main instance() { return instance; }
     public boolean isReady() { return ready&&lands!=null&&lands.healthy(); }
     public static boolean ownsLand(){return instance!=null&&instance.isReady()&&instance.ownership;}
+    private boolean cancelUnknownBlastRange(){return explosionRules!=null&&explosionRules.mode()==dev.toka.land.protection.ExplosionRules.Mode.CANCEL_WHOLE;}
     private boolean cancelEntityExplosion(cn.nukkit.entity.Entity source,Position center,double force){
         if(explosionRules==null||center==null||center.getLevel()==null||!Double.isFinite(force)||force<0)return true;
         double radius=force*2d;
