@@ -14,9 +14,11 @@ import java.util.*;
 /** Legacy user commands are enabled only after verified ownership; inspection remains available in standby. */
 public final class LandCommand extends Command {
     private final Main plugin;
+    private final ClaimTools tools;
     public LandCommand(Main plugin) {
         super("land", "Land 領地管理", "/land help");
         this.plugin=plugin;
+        this.tools=new ClaimTools(plugin);
         setPermission("tokaland.use;tokaland.inspect");
         getCommandParameters().clear();
         addCommandParameters("summary",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandReadAction",new String[]{"help","status"}))});
@@ -31,6 +33,10 @@ public final class LandCommand extends Command {
         addCommandParameters("list",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandListAction",new String[]{"list"})),CommandParameter.newType("page",true,CommandParamType.INT)});
         addCommandParameters("facility",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandFacilityAction",new String[]{"fac","facility"})),
             CommandParameter.newEnum("type",new CommandEnum("TokaLandFacilityType",plugin.facilities().types().names().toArray(new String[0]))),CommandParameter.newType("name",true,CommandParamType.STRING)});
+        addCommandParameters("localInfo",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandLocalInfoAction",new String[]{"info"}))});
+        addCommandParameters("ownerList",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandOwnerListAction",new String[]{"list"})),CommandParameter.newType("player",true,CommandParamType.TARGET)});
+        addCommandParameters("reset",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandResetAction",new String[]{"reset"})),CommandParameter.newType("claim",true,CommandParamType.STRING)});
+        addCommandParameters("clear",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandClearAction",new String[]{"clear"})),CommandParameter.newEnum("step",true,new CommandEnum("TokaLandClearStep",new String[]{"confirm"}))});
         addCommandParameters("info",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandInfoAction",new String[]{"info"})),CommandParameter.newType("claimId",CommandParamType.STRING)});
     }
     @Override public boolean execute(CommandSender sender,String label,String[] args) {
@@ -39,6 +45,8 @@ public final class LandCommand extends Command {
         if(action.equals("help")&&args.length<=1){
             if(sender.hasPermission("tokaland.inspect"))for(String key:List.of("command.helpStatus","command.helpList","command.helpInfo"))send(sender,key);
             if(sender.hasPermission("tokaland.use"))for(String key:List.of("purchase.helpSet","purchase.helpTpl","purchase.helpSelect"))send(sender,key);
+            if(sender.hasPermission("tokaland.use"))for(String key:List.of("tools.helpInfo","tools.helpList"))send(sender,key);
+            if(sender.hasPermission("tokaland.admin"))for(String key:List.of("tools.helpReset","tools.helpClear"))send(sender,key);
             if(sender.hasPermission("tokaland.admin"))send(sender,"facility.help");
             if(sender.hasPermission("tokaland.use"))for(String key:List.of("management.helpRename","management.helpGive","management.helpType","management.helpGroup","management.helpDel"))send(sender,key);
             return true;
@@ -49,6 +57,12 @@ public final class LandCommand extends Command {
         if(action.equals("fac")||action.equals("facility"))return facilityCommand(sender,args);
         if(Set.of("set","tpl","select","slt").contains(action))return purchaseCommand(sender,action,args);
         if(!sender.hasPermission("tokaland.inspect")){send(sender,"command.denied");return true;}
+        if(sender instanceof Player self&&sender.hasPermission("tokaland.use")){
+            if(action.equals("info")&&args.length==1)return tools.localInfo(self);
+            if(action.equals("list")&&args.length==2&&!args[1].chars().allMatch(Character::isDigit))return tools.ownerList(sender,args[1]);
+            if(action.equals("list")&&args.length==1&&!sender.hasPermission("tokaland.inspect"))return tools.ownerList(sender,self.getName());
+            if(action.equals("reset")||action.equals("clear"))return adminTool(self,action,args);
+        }
         if(action.equals("status")&&args.length==1){send(sender,"command.status",Main.ownsLand()?"ACTIVE":"STANDBY",plugin.allClaims().size());return true;}
         if(action.equals("list")&&args.length<=2){
             int page=1;
@@ -106,6 +120,22 @@ public final class LandCommand extends Command {
             }
         }catch(RuntimeException failure){send(sender,"purchase.unavailable",failure.getMessage());return true;}
         send(sender,"command.usage");return true;
+    }
+    private boolean adminTool(Player player,String action,String[] args){
+        if(!player.hasPermission("tokaland.admin")){send(player,"command.denied");return true;}
+        try{
+            if(action.equals("clear")){
+                if(args.length>2||args.length==2&&!args[1].equalsIgnoreCase("confirm")){send(player,"command.usage");return true;}
+                return tools.clear(player,args.length==2);
+            }
+            if(args.length>2){send(player,"command.usage");return true;}
+            var target=ClaimTargets.resolve(plugin.management().claimsAround(player),args.length==2?args[1]:null);
+            plugin.management().check(player,target);
+            return tools.reset(player,target);
+        }catch(ClaimTargets.Ambiguous ambiguous){
+            send(player,"management.ambiguous");
+            return true;
+        }catch(RuntimeException failure){send(player,"purchase.unavailable",failure.getMessage());return true;}
     }
     private boolean facilityCommand(CommandSender sender,String[] args){
         if(!(sender instanceof Player player)||!sender.hasPermission("tokaland.admin")){send(sender,"command.denied");return true;}

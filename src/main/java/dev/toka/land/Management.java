@@ -5,7 +5,12 @@ import dev.toka.land.model.ClaimAccess;
 import dev.toka.land.model.ClaimKind;
 import dev.toka.land.model.ClaimPermission;
 import dev.toka.land.model.LandClaim;
+import dev.toka.land.model.ClaimEdits;
+import dev.toka.land.model.LandSelection;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
@@ -15,6 +20,7 @@ public final class Management {
     private final LandService lands;
     private final Trading trading;
     private final PlayerNames names;
+    private final Map<UUID, List<LandClaim>> clearPreviews = new HashMap<>();
 
     Management(Main plugin, LandService lands, Trading trading, PlayerNames names) {
         this.plugin = plugin;
@@ -47,5 +53,47 @@ public final class Management {
     public CompletableFuture<String> edit(Player player, LandClaim before, LandClaim after) {
         check(player, before);
         return lands.edit(before, after);
+    }
+
+    private LandSelection draft(Player player) {
+        var tool = plugin.selectionTool();
+        var draft = tool == null ? null : tool.get(player.getUniqueId());
+        if (draft == null) throw new IllegalStateException("SELECTION_REQUIRED");
+        return draft.geometry();
+    }
+
+    private void requireAdmin(Player player) {
+        plugin.requirePrimaryThread();
+        if (!Main.ownsLand() || plugin.maintenanceLocked()) throw new IllegalStateException("LAND_NOT_ACTIVE");
+        if (!player.hasPermission("tokaland.admin")) throw new IllegalStateException("MANAGE_DENIED");
+    }
+
+    /** Administrators only: gives the claim the current selection as its whole shape. */
+    public CompletableFuture<String> reset(Player player, LandClaim claim) {
+        requireAdmin(player);
+        if (trading.hasPending(claim.id())) throw new IllegalStateException("TRANSACTION_RECOVERY_PENDING");
+        if (claim.kind() != ClaimKind.PLAYER) throw new IllegalStateException("CLAIM_NOT_PLAYER");
+        return lands.edit(claim, ClaimEdits.reshape(claim, draft(player)));
+    }
+
+    /** Player claims the selection touches. Remembered per administrator so {@link #clearConfirmed} deletes exactly this list. */
+    public List<LandClaim> clearPreview(Player player) {
+        requireAdmin(player);
+        var part = draft(player);
+        List<LandClaim> hits = plugin.allClaims().stream().filter(c -> c.kind() == ClaimKind.PLAYER)
+                .filter(c -> c.selections().stream().anyMatch(s -> LandService.overlaps(s, part)))
+                .sorted(java.util.Comparator.comparing(c -> c.id().toString())).toList();
+        if (hits.isEmpty()) clearPreviews.remove(player.getUniqueId());
+        else clearPreviews.put(player.getUniqueId(), hits);
+        return hits;
+    }
+
+    /** Deletes the previewed claims in one commit, without refunds. Fails if any of them changed since the preview. */
+    public CompletableFuture<Integer> clearConfirmed(Player player) {
+        requireAdmin(player);
+        List<LandClaim> previewed = clearPreviews.remove(player.getUniqueId());
+        if (previewed == null) throw new IllegalStateException("CLEAR_PREVIEW_REQUIRED");
+        for (LandClaim claim : previewed) if (trading.hasPending(claim.id())) throw new IllegalStateException("TRANSACTION_RECOVERY_PENDING");
+        return lands.deleteAll(previewed).thenApply(revision -> previewed.size());
     }
 }

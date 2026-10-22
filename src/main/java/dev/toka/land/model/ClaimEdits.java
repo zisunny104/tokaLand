@@ -38,4 +38,9 @@ public final class ClaimEdits {
         return new LandClaim(c.id(),c.name(),c.kind(),c.type(),c.ownerId(),c.parentClaimId(),c.inheritOwner(),c.inheritPermissions(),
                 parts,c.accessGrants(),c.accessPolicy(),c.localizedNames(),c.legacyOwnerName(),c.ownerNameSnapshot(),c.details());
     }
+    /** Replaces the claim's whole shape with one selection; the teleport point must still lie inside it. */
+    public static LandClaim reshape(LandClaim c,LandSelection part){
+        return new LandClaim(c.id(),c.name(),c.kind(),c.type(),c.ownerId(),c.parentClaimId(),c.inheritOwner(),c.inheritPermissions(),
+                List.of(part),c.accessGrants(),c.accessPolicy(),c.localizedNames(),c.legacyOwnerName(),c.ownerNameSnapshot(),c.details());
+    }
 }

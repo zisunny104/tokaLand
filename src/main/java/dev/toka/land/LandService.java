@@ -25,8 +25,22 @@ public final class LandService implements AutoCloseable {
                 throw new ClaimConflict("ID_CONFLICT");
             }
             if(existing.name().equals(claim.name()))throw new ClaimConflict("NAME_CONFLICT");
-            if(existing.kind()==ClaimKind.PLAYER&&claim.kind()==ClaimKind.PLAYER&&overlaps(existing,claim))throw new ClaimConflict("SELECTION_CONFLICT");
+            if(existing.kind()==ClaimKind.PLAYER&&claim.kind()==ClaimKind.PLAYER&&overlaps(existing,claim)&&!related(snapshot.index(),existing,claim))throw new ClaimConflict("SELECTION_CONFLICT");
         }
+    }
+    /** A sub-claim lies inside its parents by design, so claims on the same parent chain never conflict. */
+    private static boolean related(LandIndex index,LandClaim a,LandClaim b){
+        return isAncestor(index,a.id(),b)||isAncestor(index,b.id(),a);
+    }
+    private static boolean isAncestor(LandIndex index,UUID ancestor,LandClaim of){
+        Set<UUID> seen=new HashSet<>();
+        for(UUID parent=of.parentClaimId();parent!=null&&seen.add(parent);parent=index.get(parent).map(LandClaim::parentClaimId).orElse(null))
+            if(parent.equals(ancestor))return true;
+        return false;
+    }
+    public static boolean overlaps(LandSelection x,LandSelection y){
+        return x.world().equals(y.world())&&x.minX()<=y.maxX()&&x.maxX()>=y.minX()&&x.minZ()<=y.maxZ()&&x.maxZ()>=y.minZ()
+                &&(x.ignoreHeight()||y.ignoreHeight()||x.minY()<=y.maxY()&&x.maxY()>=y.minY());
     }
     public static boolean overlaps(LandClaim a,LandClaim b){
         for(var x:a.selections())for(var y:b.selections())if(x.world().equals(y.world())
@@ -62,6 +76,9 @@ public final class LandService implements AutoCloseable {
             if(!healthy)throw new IllegalStateException("Land storage requires recovery");
             if(!snapshot.index().get(before.id()).filter(before::equals).isPresent())throw new ConcurrentModificationException("CLAIM_CHANGED");
             if(!before.name().equals(after.name())&&snapshot.index().all().stream().anyMatch(c->!c.id().equals(after.id())&&c.name().equals(after.name())))throw new ClaimConflict("NAME_CONFLICT");
+            if(after.kind()==ClaimKind.PLAYER&&!before.selections().equals(after.selections())
+                &&snapshot.index().all().stream().anyMatch(c->!c.id().equals(after.id())&&c.kind()==ClaimKind.PLAYER&&overlaps(c,after)&&!related(snapshot.index(),c,after)))
+                throw new ClaimConflict("SELECTION_CONFLICT");
             var all=new ArrayList<>(snapshot.index().all());all.removeIf(c->c.id().equals(after.id()));all.add(after);
             new LandIndex(all);
             try{snapshot=repository.replace(snapshot.revision(),all);return snapshot.revision();}
@@ -74,6 +91,23 @@ public final class LandService implements AutoCloseable {
             if(!snapshot.index().get(expected.id()).filter(expected::equals).isPresent())throw new ClaimConflict("CLAIM_CHANGED");
             if(snapshot.index().all().stream().anyMatch(c->expected.id().equals(c.parentClaimId())))throw new ClaimConflict("CHILD_CLAIMS_EXIST");
             var all=new ArrayList<>(snapshot.index().all());all.removeIf(c->c.id().equals(expected.id()));
+            try{snapshot=repository.replace(snapshot.revision(),all);return snapshot.revision();}
+            catch(Exception failure){healthy=false;throw new CompletionException(failure);}
+        },writer);
+    }
+    /** Removes all given claims in one commit, only if each is unchanged and nothing outside the set still has them as parent. */
+    public CompletableFuture<String> deleteAll(List<LandClaim> expected){
+        List<LandClaim> targets=List.copyOf(expected);
+        return CompletableFuture.supplyAsync(()->{
+            if(!healthy)throw new IllegalStateException("Land storage requires recovery");
+            Set<UUID> ids=new HashSet<>();
+            for(LandClaim claim:targets){
+                if(!snapshot.index().get(claim.id()).filter(claim::equals).isPresent())throw new ClaimConflict("CLAIM_CHANGED");
+                ids.add(claim.id());
+            }
+            if(snapshot.index().all().stream().anyMatch(c->!ids.contains(c.id())&&c.parentClaimId()!=null&&ids.contains(c.parentClaimId())))
+                throw new ClaimConflict("CHILD_CLAIMS_EXIST");
+            var all=new ArrayList<>(snapshot.index().all());all.removeIf(c->ids.contains(c.id()));
             try{snapshot=repository.replace(snapshot.revision(),all);return snapshot.revision();}
             catch(Exception failure){healthy=false;throw new CompletionException(failure);}
         },writer);
