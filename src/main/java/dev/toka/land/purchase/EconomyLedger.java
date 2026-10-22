@@ -10,7 +10,9 @@ import java.util.concurrent.CompletableFuture;
  * without one the price leaves the economy and refunds are created, as before.
  */
 public final class EconomyLedger implements PurchaseCoordinator.Ledger {
-    private final Method withdraw,refundWithdrawal,deposit,transfer,has,status;
+    private final Method withdraw,refundWithdrawal,deposit,status;
+    /** Treasury support is optional: an older tokaEconomy simply has none of these, and payments then behave as before. */
+    private final Method transfer,has,hasAccount;
     private final Object purchaseCause,compensateCause,saleCause;
     private volatile boolean available=true;
     public EconomyLedger(Plugin plugin)throws ReflectiveOperationException{
@@ -21,27 +23,39 @@ public final class EconomyLedger implements PurchaseCoordinator.Ledger {
         withdraw=api.getMethod("withdrawOnce",UUID.class,String.class,long.class,cause,String.class);
         deposit=api.getMethod("depositOnce",UUID.class,String.class,long.class,cause,String.class);
         refundWithdrawal=api.getMethod("refundWithdrawalOnce",UUID.class,cause,String.class,cause);
-        transfer=api.getMethod("transferOnce",UUID.class,UUID.class,String.class,long.class,cause,String.class);
-        has=api.getMethod("has",UUID.class,String.class,long.class);
+        Method transferOnce=null,holds=null,exists=null;
+        try{
+            transferOnce=api.getMethod("transferOnce",UUID.class,UUID.class,String.class,long.class,cause,String.class);
+            holds=api.getMethod("has",UUID.class,String.class,long.class);
+            exists=api.getMethod("hasAccount",UUID.class);
+        }catch(NoSuchMethodException older){transferOnce=null;holds=null;exists=null;}
+        transfer=transferOnce;has=holds;hasAccount=exists;
         Method of=cause.getMethod("of",String.class,String.class);
         purchaseCause=of.invoke(null,"land-purchase","tokaLand");compensateCause=of.invoke(null,"land-compensate","tokaLand");
         saleCause=of.invoke(null,"land-sale","tokaLand");
     }
     public void disconnect(){available=false;}
+    /** A treasury is used only when tokaEconomy can move money between accounts and the account exists; otherwise there is none. */
+    private boolean usable(UUID account){
+        if(account==null||transfer==null||hasAccount==null||!available)return false;
+        try{return (Boolean)hasAccount.invoke(null,account);}
+        catch(ReflectiveOperationException|LinkageError failure){return false;}
+    }
     @Override public CompletableFuture<String> debit(UUID player,UUID beneficiary,String currency,long amount,String operation){
-        return beneficiary==null?invoke(withdraw,player,currency,amount,purchaseCause,operation)
+        return !usable(beneficiary)?invoke(withdraw,player,currency,amount,purchaseCause,operation)
             :invoke(transfer,player,beneficiary,currency,amount,purchaseCause,operation);
     }
     @Override public CompletableFuture<String> refund(UUID player,UUID beneficiary,String currency,long amount,String operation){
-        return beneficiary==null?invoke(refundWithdrawal,player,purchaseCause,operation,compensateCause)
+        return !usable(beneficiary)?invoke(refundWithdrawal,player,purchaseCause,operation,compensateCause)
             :invoke(transfer,beneficiary,player,currency,amount,compensateCause,"refund:"+operation);
     }
     @Override public CompletableFuture<String> credit(UUID player,UUID source,String currency,long amount,String operation){
-        return source==null?invoke(deposit,player,currency,amount,saleCause,operation)
+        return !usable(source)?invoke(deposit,player,currency,amount,saleCause,operation)
             :invoke(transfer,source,player,currency,amount,saleCause,operation);
     }
     @Override public String covers(UUID account,String currency,long amount){
         if(!available)return "UNAVAILABLE";
+        if(!usable(account))return "OK";
         try{return status.invoke(has.invoke(null,account,currency,amount)).toString();}
         catch(ReflectiveOperationException|LinkageError failure){return "UNAVAILABLE";}
     }
