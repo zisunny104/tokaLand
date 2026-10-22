@@ -28,3 +28,5 @@ LOCK 繞過目前仍停用：`requestLockBypassJson(Player, enabled, durationMil
 
 盔甲座受玩家傷害亦查實際實體位置（BUILD），依已確認的新規則統一套用全部命中領地與 Area 保護；這是相較舊 Area 沒有對應 handler 的明確行為調整。選取工具、PvP、液體／火／活塞等規則亦不在這批玩家事件範圍內。`PROTECTION_READY` 仍為 false，這批接線不代表可以停用 zero 正式保護。
 TNT 來源追蹤基礎已加入，僅使用核心明確保留的 TNT source／投射物 shooter，限制追蹤深度並偵測循環；未知來源不猜玩家。這不是跨重啟歸因紀錄，也不代表雷擊／爆炸事件已接入或玩家已獲授權。
+
+全服爆炸規則使用 protection.explosions.mode（cancel-whole／disabled）、environment-protection 與 attribution-max-depth。未知來源 TNT 與自然爆炸共用環境防護；已確認玩家來源仍檢查領地權限。規則層已測試，但完整爆炸範圍的核心事件接線尚未完成，目前設定不會讓待命版接手正式防護。

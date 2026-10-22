@@ -1,4 +1,12 @@
 language: zh-TW
+protection:
+  explosions:
+    # cancel-whole：波及需防護的領地時取消整次爆炸；disabled：不由 Land 攔截爆炸。
+    # 尚未接完核心事件範圍資訊，目前不會因這個設定而接手正式保護。
+    mode: cancel-whole
+    # 自然爆炸及無法確認玩家來源的 TNT，共用環境防護。
+    environment-protection: true
+    attribution-max-depth: 32
 ownership:
   # 尚未完成交接前保持 false；不會因為安裝插件就接手 zero。
   active: false

@@ -35,6 +35,7 @@ public final class Main extends PluginBase implements Listener {
     private static volatile Main instance;
     private DocumentStore store;
     private LandService lands;
+    private dev.toka.land.protection.ExplosionRules explosionRules;
     private volatile boolean ready;
     private boolean ownership;
     private PlayerNames playerNames;
@@ -52,6 +53,10 @@ public final class Main extends PluginBase implements Listener {
         instance = this;
         saveDefaultConfig();
         try {
+            explosionRules=dev.toka.land.protection.ExplosionRules.parse(
+                getConfig().getString("protection.explosions.mode","cancel-whole"),
+                getConfig().getBoolean("protection.explosions.environment-protection",true),
+                getConfig().getInt("protection.explosions.attribution-max-depth",32));
             Backend backend = Backend.valueOf(getConfig().getString("storage.backend", "SQLITE").strip().toUpperCase(Locale.ROOT));
             int schema = getConfig().getInt("storage.schema-version", 1);
             Path pluginDirectory = getDataFolder().toPath().toAbsolutePath().normalize();
