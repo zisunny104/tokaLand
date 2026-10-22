@@ -1,5 +1,19 @@
 language: zh-TW
 protection:
+  liquids:
+    # 阻止水／岩漿跨入、跨出或跨越不同命中領地；同一組領地內流動保留。
+    prevent-boundary-flow: true
+  growth:
+    # 樹木／方塊擴散不得跨越領地命中邊界；領地內的自然生長保留。
+    prevent-boundary-crossing: true
+  entities:
+    # 阻止生物在任何命中領地內踩踏耕地或觸發方塊互動。
+    block-mob-interactions: true
+    # 無法確認玩家來源的生物／環境傷害，在領地內採保護優先。
+    prevent-unattributed-damage: true
+  lightning:
+    # 阻止領地內的雷擊、雷擊點火、雷擊傷害及可識別的生物轉化。
+    protect-claims: true
   explosions:
     # cancel-whole：波及需防護的領地時取消整次爆炸；disabled：不由 Land 攔截爆炸。
     # 範圍無法核實時取消整次爆炸，包含沒有 force 的區塊來源爆炸。
@@ -20,3 +34,8 @@ storage:
 display:
   player-land-topbar: true
   public-land-topbar: false
+
+selection:
+  enabled: true
+  # 可用 Nukkit Item 名稱或 ID:damage，例如 wooden_axe:0、271:0。
+  tool: wooden_axe:0

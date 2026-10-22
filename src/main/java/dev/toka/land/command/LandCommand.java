@@ -11,7 +11,7 @@ import java.util.*;
 public final class LandCommand extends Command {
     private final Main plugin;
     public LandCommand(Main plugin) {
-        super("tokaland", "Land 資料查詢", "/tokaland help");
+        super("land", "Land 領地管理", "/land help");
         this.plugin=plugin;
         setPermission("tokaland.inspect");
         getCommandParameters().clear();

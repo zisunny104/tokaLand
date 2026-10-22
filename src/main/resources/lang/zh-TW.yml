@@ -1,8 +1,8 @@
 command:
   denied: "§c你沒有查詢領地資料的權限。"
-  helpStatus: "§e/tokaland status §7— 顯示資料筆數與管理狀態"
-  helpList: "§e/tokaland list [頁碼:int] §7— 列出原生領地資料"
-  helpInfo: "§e/tokaland info <領地ID:UUID> §7— 查詢擁有者及所有選區"
+  helpStatus: "§e/land status §7— 顯示資料筆數與管理狀態"
+  helpList: "§e/land list [頁碼:int] §7— 列出原生領地資料"
+  helpInfo: "§e/land info <領地ID:UUID> §7— 查詢擁有者及所有選區"
   status: "§bLand 狀態：${0}；領地共 ${1} 筆。"
   invalidPage: "§c頁碼必須為有效範圍內的正整數。"
   listHeader: "§b領地資料：第 ${0}/${1} 頁，共 ${2} 筆。"
@@ -11,7 +11,10 @@ command:
   notFound: "§e找不到領地：${0}"
   info: "§bID：${0}\n§r名稱：${1}\n擁有者：${2}\n世界：${3}\n分類：${4} / ${5}\n保護：${6}\n選區數：${7}"
   selection: "§7選區 ${0}：(${1},${2},${3})～(${4},${5},${6})；忽略高度=${7}"
-  usage: "§e請輸入 /tokaland help 查看可用指令。"
+  usage: "§e請輸入 /land help 查看可用指令。"
+selection:
+  first: "§a選區第一點：${0} (${1}, ${2}, ${3})"
+  second: "§a選區第二點：${0} (${1}, ${2}, ${3})"
 ui:
   land: "§8[領地]§r${0} §8[擁有者]§r${1}"
   pending: "${0}（待身分確認）"

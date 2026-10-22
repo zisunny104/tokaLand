@@ -45,6 +45,7 @@ public final class Main extends PluginBase implements Listener {
     private java.lang.reflect.Method displayBossBar;
     private java.lang.reflect.Method displayRemove;
     private dev.toka.land.command.LandCommand readCommand;
+    private dev.toka.land.protection.SelectionToolListener selectionToolListener;
     private volatile boolean maintenanceLocked;
     private record ProtectedAuthority(String pluginName,Plugin pluginIdentity,java.util.function.BiPredicate<Player,String> callback){}
     private volatile ProtectedAuthority protectedAuthority;
@@ -72,14 +73,33 @@ public final class Main extends PluginBase implements Listener {
             connectDisplay();
             getServer().getPluginManager().registerEvents(this, this);
             getServer().getPluginManager().registerEvents(new dev.toka.land.protection.PlayerProtectionListener(this), this);
+            getServer().getPluginManager().registerEvents(new dev.toka.land.protection.NaturalChangeListener(this),this);
             var explosionListener=new dev.toka.land.protection.ExplosionProtectionListener(
                 Main::ownsLand,this::cancelUnknownBlastRange,this::cancelEntityExplosion,()->getServer().getTick(),
                 line->getLogger().warning(line));
             getServer().getPluginManager().registerEvents(explosionListener,this);
             getServer().getScheduler().scheduleRepeatingTask(this,explosionListener::prune,20);
+            if(getConfig().getBoolean("selection.enabled",true)){
+                var configuredTool=cn.nukkit.item.Item.fromString(getConfig().getString("selection.tool","wooden_axe:0"));
+                if(configuredTool.getId()==0)getLogger().warning("選地工具設定無效，已停用選區點擊；請檢查 selection.tool。");
+                else{
+                    selectionToolListener=new dev.toka.land.protection.SelectionToolListener(this,configuredTool);
+                    getServer().getPluginManager().registerEvents(selectionToolListener,this);
+                }
+            }
             ready = true;
             readCommand=new dev.toka.land.command.LandCommand(this);
-            getServer().getCommandMap().register("tokaland",readCommand);
+            var commandMap=getServer().getCommandMap();
+            var existingLand=commandMap.getCommand("land");
+            if(existingLand!=null&&existingLand!=readCommand){
+                getLogger().warning("/land 已由其他插件註冊；依搬遷流程先在 zero 設定 features.land: false 並重啟，再由 tokaLand 註冊 /land。此次不註冊替代指令。");
+                readCommand=null;
+            }else if(commandMap.register("tokaLand",readCommand)&&commandMap.getCommand("land")==readCommand)
+                getLogger().info("指令 /land 已註冊，Tab 候選已啟用。");
+            else{
+                getLogger().error("無法註冊根指令 /land；請檢查指令衝突。未啟用其他替代入口。");
+                readCommand=null;
+            }
             getServer().getScheduler().scheduleRepeatingTask(this, this::refreshTopbars, 20);
             getLogger().info("Land 資料載入完成，共 " + claims.size() + " 筆；儲存格式：" + backend);
         } catch (Exception error) {
@@ -106,6 +126,20 @@ public final class Main extends PluginBase implements Listener {
     public static Main instance() { return instance; }
     public boolean isReady() { return ready&&lands!=null&&lands.healthy(); }
     public static boolean ownsLand(){return instance!=null&&instance.isReady()&&instance.ownership;}
+    public boolean protectedEnvironment(Position target){
+        if(!ownsLand()||target==null||target.getLevel()==null)return false;
+        return maintenanceLocked||!lands.snapshot().index().findAllAt(target.getLevel().getFolderName(),target.getFloorX(),target.getFloorY(),target.getFloorZ()).isEmpty();
+    }
+    public boolean crossesLandBoundary(cn.nukkit.block.Block from,cn.nukkit.block.Block to,String configKey){
+        if(!ownsLand()||!getConfig().getBoolean(configKey,true)||from==null||to==null
+            ||from.getLevel()==null||to.getLevel()==null)return false;
+        var index=lands.snapshot().index();
+        var source=index.findAllAt(from.getLevel().getFolderName(),from.getFloorX(),from.getFloorY(),from.getFloorZ())
+            .stream().map(LandClaim::id).collect(java.util.stream.Collectors.toSet());
+        var destination=index.findAllAt(to.getLevel().getFolderName(),to.getFloorX(),to.getFloorY(),to.getFloorZ())
+            .stream().map(LandClaim::id).collect(java.util.stream.Collectors.toSet());
+        return (!source.isEmpty()||!destination.isEmpty())&&!source.equals(destination);
+    }
     private boolean cancelUnknownBlastRange(){return explosionRules!=null&&explosionRules.mode()==dev.toka.land.protection.ExplosionRules.Mode.CANCEL_WHOLE;}
     private boolean cancelEntityExplosion(cn.nukkit.entity.Entity source,Position center,double force){
         if(explosionRules==null||center==null||center.getLevel()==null||!Double.isFinite(force)||force<0)return true;
@@ -209,6 +243,9 @@ public final class Main extends PluginBase implements Listener {
     public Collection<LandClaim> allClaims(){return lands.snapshot().index().all();}
     public String language(cn.nukkit.command.CommandSender sender){return sender instanceof Player player?player.getLocale().toLanguageTag():getConfig().getString("language","zh-TW");}
     public String text(cn.nukkit.command.CommandSender sender,String key,Object...args){return message(language(sender),key,args);}
+    public void sendSelectionPoint(Player player,boolean first,dev.toka.land.protection.SelectionToolListener.Point point){
+        player.sendMessage(text(player,first?"selection.first":"selection.second",point.world(),point.x(),point.y(),point.z()));
+    }
     public String ownerDisplay(LandClaim claim,String language){return ownerText(claim,language);}
     public static String exportDatasetJson(){
         Main main=instance;if(main==null||!main.isReady())throw new IllegalStateException("Land unavailable");
