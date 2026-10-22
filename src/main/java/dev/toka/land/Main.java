@@ -24,8 +24,6 @@ import java.util.function.BiPredicate;
  * plugins call by reflection. The work itself lives in the service classes of this package.
  */
 public final class Main extends PluginBase {
-    /** Stays false until the cutover is verified; with it false Land never takes over protection. */
-    private static final boolean PROTECTION_READY = false;
     private static volatile Main instance;
 
     private DocumentStore store;
@@ -62,8 +60,9 @@ public final class Main extends PluginBase {
             store = DocumentStore.open(new StoreConfig(backend, directory, config.getInt("storage.schema-version", 1)));
             lands = new LandService(new DatasetRepository(store));
             // The cutover tool flips ownership.active only after the previous manager is disabled; Land never probes other plugins.
-            ownership = PROTECTION_READY && config.getBoolean("ownership.active", false);
-            if (config.getBoolean("ownership.active", false) && !ownership) getLogger().error("Land 保護尚未完成驗證；保持待命。");
+            ownership = config.getBoolean("ownership.active", false);
+            if (ownership) getLogger().warning("Land 已接手領地保護；請確認舊的領地管理者已停用，否則兩邊會同時攔截。");
+            else getLogger().info("Land 待命中：ownership.active 為 false，不攔截任何事件。");
 
             playerNames = new PlayerNames(getServer());
             providers = new Providers(this);

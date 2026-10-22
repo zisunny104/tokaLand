@@ -24,6 +24,7 @@ public final class Providers {
     private final Map<String, Registration<BiPredicate<Player, String>>> groups = new HashMap<>();
     private volatile Registration<BiPredicate<Player, String>> authority;
     private Registration<BiFunction<Player, String, String>> pricing;
+    private boolean pricingLost;
 
     Providers(Main plugin) { this.plugin = plugin; }
 
@@ -38,7 +39,10 @@ public final class Providers {
         return current == registration.identity() && current.isEnabled();
     }
 
-    /** The provider keeps its own legacy rules; ordinary claim membership is no replacement. One provider at a time. */
+    /**
+     * The provider keeps its own legacy rules; ordinary claim membership is no replacement. One provider at a time.
+     * TODO(migration): the legacy qx permission rules for PROTECT claims still need an owner once zero is gone.
+     */
     public void registerAuthority(String name, BiPredicate<Player, String> callback) {
         Plugin provider = enabled(name, "Authority provider");
         Registration<?> existing = authority;
@@ -91,20 +95,31 @@ public final class Providers {
         }
     }
 
-    /** Region rules and price adjustments. TODO(migration): zero is the only provider; remove its adapter once Region and tax/discount rules have an owner. */
+    /**
+     * Region rules and price adjustments are optional: without a provider Land uses its own defaults.
+     * TODO(migration): zero is the only provider today; replace it when Region and the tax/discount rules have an owner.
+     */
     public void registerPricing(String name, BiFunction<Player, String, String> callback) {
         Plugin provider = enabled(name, "Purchase policy provider");
         if (pricing != null && pricing.identity() != provider && pricing.identity().isEnabled())
             throw new IllegalStateException("Purchase policy already registered");
         pricing = new Registration<>(name, provider, Objects.requireNonNull(callback));
+        pricingLost = false;
     }
 
-    /** Asks the region/pricing provider (SELECT or ADJUST); anything but an OK reply fails the operation. */
-    public JsonObject ask(Player player, JsonObject request) {
+    /**
+     * Asks the region/pricing provider (SELECT or ADJUST). Empty when none was ever registered, so the caller applies
+     * its defaults; a provider that disappeared after registering fails closed instead of silently changing prices.
+     */
+    public Optional<JsonObject> ask(Player player, JsonObject request) {
         var provider = pricing;
-        if (provider == null || !alive(provider)) throw new IllegalStateException("PURCHASE_POLICY_UNAVAILABLE");
+        if (provider == null) {
+            if (pricingLost) throw new IllegalStateException("PURCHASE_POLICY_UNAVAILABLE");
+            return Optional.empty();
+        }
+        if (!alive(provider)) { pricing = null; pricingLost = true; throw new IllegalStateException("PURCHASE_POLICY_UNAVAILABLE"); }
         var reply = JsonParser.parseString(provider.callback().apply(player, request.toString())).getAsJsonObject();
         if (!"OK".equals(reply.get("status").getAsString())) throw new IllegalStateException("PURCHASE_POLICY_DENIED");
-        return reply;
+        return Optional.of(reply);
     }
 }

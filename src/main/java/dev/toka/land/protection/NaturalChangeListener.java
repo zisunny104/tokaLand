@@ -13,7 +13,11 @@ import cn.nukkit.event.weather.LightningStrikeEvent;
 import dev.toka.land.Main;
 import cn.nukkit.level.Position;
 
-/** Boundary-aware protection for non-player world changes. */
+/**
+ * Boundary-aware protection for non-player world changes.
+ * TODO(migration): server-wide world rules (liquid, fire and piston clean-up outside claims, farmland trampling, pistons
+ * moving chests) are not claim rules; they need an owner (a world-protection plugin) before the legacy manager retires.
+ */
 public final class NaturalChangeListener implements Listener {
     private final Main plugin;
     public NaturalChangeListener(Main plugin){this.plugin=plugin;}

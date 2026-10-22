@@ -55,7 +55,8 @@ public final class Trading implements Listener, AutoCloseable {
         JsonObject request = new JsonObject();
         request.addProperty("action", "SELECT");
         request.add("point", GSON.toJsonTree(point));
-        return plugin.providers().ask(player, request).get("ignoreHeight").getAsBoolean();
+        return plugin.providers().ask(player, request).map(reply -> reply.get("ignoreHeight").getAsBoolean())
+                .orElse(plugin.getConfig().getBoolean("selection.default-ignore-height", false));
     }
 
     public CompletableFuture<PurchaseCoordinator.Outcome> purchase(Player player, String name) {
@@ -74,7 +75,10 @@ public final class Trading implements Listener, AutoCloseable {
         request.add("second", GSON.toJsonTree(draft.second()));
         request.addProperty("ignoreHeight", draft.ignoreHeight());
         request.addProperty("ownedCount", plugin.index().ownedBy(owner).size());
-        JsonObject adjustment = plugin.providers().ask(player, request);
+        JsonObject none = new JsonObject();
+        none.addProperty("offer", 1.0);
+        none.addProperty("tax", 1.0);
+        JsonObject adjustment = plugin.providers().ask(player, request).orElse(none);
         long amount = pricing.quote(part, adjustment.get("offer").getAsDouble(), adjustment.get("tax").getAsDouble());
         LandClaim claim = new LandClaim(UUID.randomUUID(), name, ClaimKind.PLAYER, "land", owner, null, false, false, List.of(part), List.of(),
                 AccessPolicy.privateDefault(), Map.of(), null, player.getName(), new ClaimDetails(owner, player.getName(), draft.teleport(), true));

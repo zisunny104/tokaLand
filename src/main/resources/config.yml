@@ -18,13 +18,14 @@ protection:
     # cancel-whole：波及需防護的領地時取消整次爆炸；disabled：不由 Land 攔截爆炸。
     # 範圍無法核實時取消整次爆炸，包含沒有 force 的區塊來源爆炸。
     # 這可能取消領地外的床／重生錨爆炸；若要完全停用 Land 爆炸攔截，設定 mode: disabled。
-    # 正式保護仍受 ownership.active 與程式待命閘門控制。
+    # 只有 ownership.active 為 true 時才會攔截。
     mode: cancel-whole
     # 自然爆炸及無法確認玩家來源的 TNT，共用環境防護。
     environment-protection: true
     attribution-max-depth: 32
 ownership:
-  # 尚未完成交接前保持 false；不會因為安裝插件就接手 zero。
+  # 預設 false＝待命：只讀取與檢視資料，不攔截事件、不允許寫入指令。
+  # 確認舊的領地管理者已停用後才改為 true，兩邊不可同時運作。
   active: false
 storage:
   backend: SQLITE
@@ -37,8 +38,10 @@ display:
 
 selection:
   enabled: true
-  # 可用 Nukkit Item 名稱或 ID:damage；預設沿用 zero 的木鋤（290）。
+  # 可用 Nukkit Item 名稱或 ID:damage；預設為木鋤（290）。
   tool: "290:0"
+  # 沒有區域 provider 時，新選區是否預設忽略高度（平面領地）。
+  default-ignore-height: false
 
 facility:
   # 設施領地類型，可自行增加（小寫英文、數字、_ 或 -，最長 16 字）。
