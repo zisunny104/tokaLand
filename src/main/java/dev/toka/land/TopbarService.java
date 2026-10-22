@@ -2,12 +2,13 @@ package dev.toka.land;
 
 import cn.nukkit.Player;
 import cn.nukkit.event.EventHandler;
+import cn.nukkit.event.EventPriority;
 import cn.nukkit.event.Listener;
-import cn.nukkit.event.player.PlayerJoinEvent;
-import cn.nukkit.event.player.PlayerMoveEvent;
 import cn.nukkit.event.player.PlayerQuitEvent;
 import cn.nukkit.level.Position;
 import cn.nukkit.plugin.Plugin;
+import dev.toka.land.event.PlayerEnterClaimEvent;
+import dev.toka.land.event.PlayerLeaveClaimEvent;
 import dev.toka.land.model.ClaimKind;
 import java.lang.reflect.Method;
 import java.util.*;
@@ -33,25 +34,21 @@ final class TopbarService implements Listener {
         }
     }
 
-    @EventHandler public void onJoin(PlayerJoinEvent event) { update(event.getPlayer()); }
+    @EventHandler public void onEnter(PlayerEnterClaimEvent event) { update(event.getPlayer(), event.getAt()); }
 
-    @EventHandler public void onMove(PlayerMoveEvent event) {
-        Position from = event.getFrom(), to = event.getTo();
-        if (from.getLevel() != to.getLevel() || from.getFloorX() != to.getFloorX()
-                || from.getFloorY() != to.getFloorY() || from.getFloorZ() != to.getFloorZ())
-            update(event.getPlayer());
-    }
+    @EventHandler public void onLeave(PlayerLeaveClaimEvent event) { update(event.getPlayer(), event.getAt()); }
 
-    @EventHandler public void onQuit(PlayerQuitEvent event) { remove(event.getPlayer()); }
+    /** Runs after the tracker's leave events, so the hint is cleared last. */
+    @EventHandler(priority = EventPriority.MONITOR) public void onQuit(PlayerQuitEvent event) { remove(event.getPlayer()); }
 
     void removeAll() {
         for (Player player : plugin.getServer().getOnlinePlayers().values()) remove(player);
     }
 
-    private void update(Player player) {
-        if (show == null || !Main.ownsLand() || !plugin.getConfig().getBoolean("display.player-land-topbar", true)) return;
+    private void update(Player player, Position at) {
+        if (show == null || at.getLevel() == null || !Main.ownsLand() || !plugin.getConfig().getBoolean("display.player-land-topbar", true)) return;
         String language = player.getLocale().toLanguageTag();
-        List<String> lines = plugin.findAllAt(player.getLevel().getFolderName(), player.getFloorX(), player.getFloorY(), player.getFloorZ())
+        List<String> lines = plugin.findAllAt(at.getLevel().getFolderName(), at.getFloorX(), at.getFloorY(), at.getFloorZ())
                 .stream().filter(claim -> claim.kind() == ClaimKind.PLAYER)
                 .map(claim -> plugin.texts().message(language, "ui.land", claim.displayName(language), plugin.texts().ownerText(claim, language)))
                 .distinct().sorted(String.CASE_INSENSITIVE_ORDER).toList();

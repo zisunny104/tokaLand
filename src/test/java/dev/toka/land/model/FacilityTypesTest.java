@@ -34,4 +34,8 @@ public class FacilityTypesTest {
     @Test(expected = IllegalArgumentException.class) public void invalidTypeNameIsRejected() {
         new FacilityTypes(Map.of("Bad Name", new FacilityTypes.Reach(0, 0)));
     }
+
+    @Test(expected = IllegalArgumentException.class) public void subcommandNameIsRejectedAsAType() {
+        new FacilityTypes(Map.of("lock", new FacilityTypes.Reach(0, 0)));
+    }
 }

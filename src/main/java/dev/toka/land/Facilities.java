@@ -4,6 +4,7 @@ import cn.nukkit.Player;
 import cn.nukkit.utils.Config;
 import dev.toka.land.model.*;
 import java.util.*;
+import java.util.stream.Collectors;
 import java.util.concurrent.CompletableFuture;
 
 /** Roads, rails and other facility claims, created by administrators from the selection tool. */
@@ -59,4 +60,60 @@ public final class Facilities {
         }
         return work.thenApply(revision -> { tool.forget(player.getUniqueId()); return status; });
     }
+
+    /** Facilities by name, for paging. */
+    public List<LandClaim> list() {
+        return plugin.allClaims().stream().filter(c -> c.kind() == ClaimKind.FACILITY)
+                .sorted(Comparator.comparing(LandClaim::name, String.CASE_INSENSITIVE_ORDER)).toList();
+    }
+
+    /** Finds a facility by UUID or by a name that matches exactly one facility. */
+    public LandClaim find(String idOrName) {
+        List<LandClaim> all = list();
+        try {
+            UUID id = UUID.fromString(idOrName.strip());
+            return all.stream().filter(c -> c.id().equals(id)).findFirst().orElseThrow(() -> new IllegalStateException("FACILITY_NOT_FOUND"));
+        } catch (IllegalArgumentException notAnId) { /* fall through to the name lookup */ }
+        List<LandClaim> matches = all.stream().filter(c -> c.name().equalsIgnoreCase(idOrName.strip())).toList();
+        if (matches.size() > 1) throw new IllegalStateException("FACILITY_AMBIGUOUS");
+        return matches.stream().findFirst().orElseThrow(() -> new IllegalStateException("FACILITY_NOT_FOUND"));
+    }
+
+    private void requireAdmin(Player player) {
+        plugin.requirePrimaryThread();
+        if (!Main.ownsLand() || plugin.maintenanceLocked()) throw new IllegalStateException("LAND_NOT_ACTIVE");
+        if (!player.hasPermission("tokaland.admin")) throw new IllegalStateException("MANAGE_DENIED");
+    }
+
+    /** A locked facility can only be unlocked; every other change waits for that. */
+    private LandClaim editable(Player player, String idOrName) {
+        requireAdmin(player);
+        LandClaim claim = find(idOrName);
+        if (claim.accessPolicy().locked()) throw new IllegalStateException("CLAIM_LOCKED");
+        return claim;
+    }
+
+    public CompletableFuture<String> delete(Player player, String idOrName) {
+        return lands.delete(editable(player, idOrName));
+    }
+
+    public CompletableFuture<String> retype(Player player, String idOrName, String type) {
+        if (!types.has(type)) throw new IllegalArgumentException("UNKNOWN_FACILITY_TYPE");
+        LandClaim claim = editable(player, idOrName);
+        return lands.edit(claim, ClaimEdits.facilityType(claim, type.toLowerCase(Locale.ROOT)));
+    }
+
+    /** Sets who may build: PRIVATE (administrators only), OPEN (anyone) or PROTECT (administrators and the external authority). */
+    public CompletableFuture<String> mode(Player player, String idOrName, AccessPolicy.Mode mode) {
+        LandClaim claim = editable(player, idOrName);
+        return lands.edit(claim, ClaimEdits.policy(claim, new AccessPolicy(mode, false)));
+    }
+
+    public CompletableFuture<String> lock(Player player, String idOrName, boolean locked) {
+        requireAdmin(player);
+        LandClaim claim = find(idOrName);
+        return lands.edit(claim, ClaimEdits.policy(claim, new AccessPolicy(claim.accessPolicy().mode(), locked)));
+    }
+
+    public String names() { return types.names().stream().collect(Collectors.joining(", ")); }
 }

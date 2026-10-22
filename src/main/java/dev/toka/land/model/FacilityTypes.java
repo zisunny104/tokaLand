@@ -7,6 +7,8 @@ import java.util.regex.Pattern;
 public final class FacilityTypes {
     private static final Pattern NAME = Pattern.compile("[a-z][a-z0-9_-]{0,15}");
     private static final int MAX_REACH = 256;
+    /** Subcommands of /land fac; a type with one of these names could never be created. */
+    public static final Set<String> SUBCOMMANDS = Set.of("list", "del", "type", "mode", "lock", "help");
 
     public record Reach(int below, int above) {
         public Reach {
@@ -20,7 +22,7 @@ public final class FacilityTypes {
         Map<String, Reach> checked = new TreeMap<>();
         types.forEach((name, reach) -> {
             String key = name.toLowerCase(Locale.ROOT);
-            if (!NAME.matcher(key).matches()) throw new IllegalArgumentException("INVALID_FACILITY_TYPE: " + name);
+            if (!NAME.matcher(key).matches() || SUBCOMMANDS.contains(key)) throw new IllegalArgumentException("INVALID_FACILITY_TYPE: " + name);
             checked.put(key, Objects.requireNonNull(reach));
         });
         this.types = Map.copyOf(checked);

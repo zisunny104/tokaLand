@@ -87,6 +87,7 @@ public final class Main extends PluginBase {
 
     private void registerListeners() {
         var plugins = getServer().getPluginManager();
+        plugins.registerEvents(new ClaimTracker(this), this);
         plugins.registerEvents(topbar, this);
         plugins.registerEvents(trading, this);
         plugins.registerEvents(new PlayerProtectionListener(this), this);

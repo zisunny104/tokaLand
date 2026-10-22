@@ -52,4 +52,12 @@ public final class ClaimEdits {
         return new LandClaim(c.id(),c.name(),c.kind(),c.type(),c.ownerId(),c.parentClaimId(),c.inheritOwner(),c.inheritPermissions(),
                 parts,c.accessGrants(),c.accessPolicy(),c.localizedNames(),c.legacyOwnerName(),c.ownerNameSnapshot(),details);
     }
+    public static LandClaim facilityType(LandClaim c,String type){
+        return new LandClaim(c.id(),c.name(),c.kind(),type,c.ownerId(),c.parentClaimId(),c.inheritOwner(),c.inheritPermissions(),
+                c.selections(),c.accessGrants(),c.accessPolicy(),c.localizedNames(),c.legacyOwnerName(),c.ownerNameSnapshot(),c.details());
+    }
+    public static LandClaim policy(LandClaim c,AccessPolicy policy){
+        return new LandClaim(c.id(),c.name(),c.kind(),c.type(),c.ownerId(),c.parentClaimId(),c.inheritOwner(),c.inheritPermissions(),
+                c.selections(),c.accessGrants(),policy,c.localizedNames(),c.legacyOwnerName(),c.ownerNameSnapshot(),c.details());
+    }
 }
