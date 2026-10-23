@@ -31,6 +31,17 @@ final class ClaimTracker implements Listener {
             update(event.getPlayer(), to);
     }
 
+    /**
+     * Checks everybody again, once a second: a move that was never reported (a respawn, a world change, a teleport that no event told
+     * about) or a claim that was made, removed or changed while someone stood in it is caught here, and the enter and leave events
+     * that were missing are sent.
+     */
+    void reconcile() {
+        for (Player player : plugin.getServer().getOnlinePlayers().values()) {
+            if (player.isOnline() && player.spawned) update(player, player.getPosition());
+        }
+    }
+
     @EventHandler public void onQuit(PlayerQuitEvent event) {
         Player player = event.getPlayer();
         var before = inside.remove(player.getUniqueId());
@@ -47,7 +58,7 @@ final class ClaimTracker implements Listener {
         Map<UUID, LandClaim> now = new HashMap<>();
         plugin.findAllAt(at.getLevel().getFolderName(), at.getFloorX(), at.getFloorY(), at.getFloorZ()).forEach(claim -> now.put(claim.id(), claim));
         Map<UUID, LandClaim> before = inside.getOrDefault(id, Map.of());
-        if (now.keySet().equals(before.keySet())) return;
+        if (now.equals(before)) return; // the same claims, unchanged
         inside.put(id, now);
         before.forEach((claimId, claim) -> { if (!now.containsKey(claimId)) fireLeave(player, claim, at); });
         now.forEach((claimId, claim) -> { if (!before.containsKey(claimId)) fireEnter(player, claim, at); });

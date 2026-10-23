@@ -96,7 +96,10 @@ public final class Main extends PluginBase {
         var plugins = getServer().getPluginManager();
         legacyLink = new LegacyLink(this);
         plugins.registerEvents(legacyLink, this);
-        plugins.registerEvents(new ClaimTracker(this), this);
+        var tracker = new ClaimTracker(this);
+        plugins.registerEvents(tracker, this);
+        getServer().getScheduler().scheduleRepeatingTask(this, tracker::reconcile, 20);
+        getServer().getScheduler().scheduleRepeatingTask(this, () -> topbar.refresh(), 20);
         plugins.registerEvents(topbar, this);
         plugins.registerEvents(window, this);
         plugins.registerEvents(trading, this);

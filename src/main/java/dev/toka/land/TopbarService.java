@@ -57,6 +57,13 @@ final class TopbarService implements Listener {
     /** Runs after the tracker's leave events, so the hint is cleared last. */
     @EventHandler(priority = EventPriority.MONITOR) public void onQuit(PlayerQuitEvent event) { remove(event.getPlayer()); }
 
+    /** Shows each player what is right for where they stand now, whatever events have or have not come: it fixes a hint that went missing or is out of date. */
+    void refresh() {
+        for (Player player : plugin.getServer().getOnlinePlayers().values()) {
+            if (player.isOnline() && player.spawned) update(player, player.getPosition());
+        }
+    }
+
     void removeAll() {
         Plugin display = plugin.getServer().getPluginManager().getPlugin("tokaDisplay");
         if (display != null) {
