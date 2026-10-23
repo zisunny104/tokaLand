@@ -61,7 +61,7 @@ facility:
       below: 0
       above: 0
 
-# 子領地租賃：領地擁有者用 /land sub 切出子領地，/land lease offer 出租，租金付給領地擁有者。
+# 下級領地租賃：領地擁有者用 /land sub 切出下級領地，/land lease offer 出租，租金付給領地擁有者。
 lease:
   currency: money # 租金的貨幣代碼
   period-days: 90 # 一期幾天（預設三個月）

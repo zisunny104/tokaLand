@@ -358,7 +358,7 @@ public final class Leases {
                 // a sub-claim that was deleted takes its letting with it
                 if (claim(UUID.fromString(lease.claimId)).isEmpty()) {
                     book.delete(UUID.fromString(lease.claimId));
-                    plugin.getLogger().info("子領地已不存在，移除它的租賃資料：" + lease.claimId);
+                    plugin.getLogger().info("下級領地已不存在，移除它的租賃資料：" + lease.claimId);
                     continue;
                 }
                 switch (lease.state) {
