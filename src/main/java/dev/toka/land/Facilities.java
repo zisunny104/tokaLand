@@ -11,11 +11,16 @@ import java.util.concurrent.CompletableFuture;
 public final class Facilities {
     private final Main plugin;
     private final LandService lands;
-    private final FacilityTypes types;
+    private volatile FacilityTypes types;
 
     Facilities(Main plugin, LandService lands, Config config) {
         this.plugin = plugin;
         this.lands = lands;
+        reload(config);
+    }
+
+    /** Reads the facility types again from the (re-read) config. */
+    void reload(Config config) {
         Map<String, FacilityTypes.Reach> reach = new HashMap<>();
         var section = config.getSection("facility.types");
         for (String name : section.getKeys(false))

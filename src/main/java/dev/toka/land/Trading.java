@@ -28,18 +28,23 @@ public final class Trading implements Listener, AutoCloseable {
     private final Main plugin;
     private final PurchaseCoordinator purchases;
     private final SaleCoordinator sales;
-    private final LandPricing pricing;
+    private volatile LandPricing pricing;
     private volatile EconomyLedger ledger;
     private Plugin economy;
     private final AtomicBoolean recovering = new AtomicBoolean();
 
     Trading(Main plugin, LandService lands, DocumentStore store) throws IOException {
         this.plugin = plugin;
+        reloadPricing();
+        this.purchases = new PurchaseCoordinator(lands, store, () -> ledger);
+        this.sales = new SaleCoordinator(lands, store, () -> ledger);
+    }
+
+    /** Reads the price settings again; a quote in progress keeps the old object. */
+    void reloadPricing() {
         var config = plugin.getConfig();
         this.pricing = new LandPricing(config.getString("pricing.currency", "money"), config.getDouble("pricing.per-block", 6.3),
                 config.getDouble("pricing.per-block-flat", 73.1), config.getDouble("pricing.refund-rate", 0.7));
-        this.purchases = new PurchaseCoordinator(lands, store, () -> ledger);
-        this.sales = new SaleCoordinator(lands, store, () -> ledger);
     }
 
     public boolean hasPending() { return purchases.hasPending() || sales.hasPending(); }
@@ -129,9 +134,9 @@ public final class Trading implements Listener, AutoCloseable {
         var selling = sales.recover();
         CompletableFuture.allOf(buying, selling).whenComplete((ignored, failure) -> {
             recovering.set(false);
-            if (failure != null) { plugin.getLogger().warning("領地交易恢復未完成：" + failure.getClass().getSimpleName()); return; }
-            for (var result : buying.join()) if (!result.status().equals("PENDING")) plugin.getLogger().info("購地交易恢復：" + result.operation() + " " + result.status());
-            for (var result : selling.join()) if (!result.status().equals("PENDING")) plugin.getLogger().info("售地交易恢復：" + result.operation() + " " + result.status());
+            if (failure != null) { plugin.texts().warn("log.tradeRecoverFailed", failure.getClass().getSimpleName()); return; }
+            for (var result : buying.join()) if (!result.status().equals("PENDING")) plugin.texts().info("log.buyRecovered", result.operation(), result.status());
+            for (var result : selling.join()) if (!result.status().equals("PENDING")) plugin.texts().info("log.sellRecovered", result.operation(), result.status());
         });
     }
 
@@ -141,7 +146,7 @@ public final class Trading implements Listener, AutoCloseable {
         disconnect();
         if (current == null || !current.isEnabled()) return;
         try { ledger = new EconomyLedger(current); economy = current; }
-        catch (ReflectiveOperationException | LinkageError failure) { plugin.getLogger().warning("購地交易 API 尚未就緒：" + failure.getClass().getSimpleName()); }
+        catch (ReflectiveOperationException | LinkageError failure) { plugin.texts().warn("log.tradeApiMissing", failure.getClass().getSimpleName()); }
     }
 
     private void disconnect() {
@@ -157,7 +162,7 @@ public final class Trading implements Listener, AutoCloseable {
     /** Closes both ledgers; a transaction still saving keeps the storage lock. */
     @Override public void close() throws IOException {
         disconnect();
-        try { sales.close(); } catch (IOException error) { plugin.getLogger().error("售地交易仍在保存，保留儲存鎖。", error); throw error; }
-        try { purchases.close(); } catch (IOException error) { plugin.getLogger().error("購地交易仍在保存，保留儲存鎖。", error); throw error; }
+        try { sales.close(); } catch (IOException error) { plugin.texts().error("log.salesPending", error); throw error; }
+        try { purchases.close(); } catch (IOException error) { plugin.texts().error("log.purchasesPending", error); throw error; }
     }
 }

@@ -52,6 +52,8 @@ public final class Main extends PluginBase {
     @Override public void onEnable() {
         instance = this;
         saveDefaultConfig();
+        playerNames = new PlayerNames(getServer());
+        texts = new Texts(this, playerNames);
         try {
             var config = getConfig();
             explosionRules = ExplosionRules.parse(config.getString("protection.explosions.mode", "cancel-whole"),
@@ -66,10 +68,8 @@ public final class Main extends PluginBase {
             // The cutover tool flips ownership.active only after the previous manager is disabled; Land never probes other plugins.
             ownership = config.getBoolean("ownership.active", false);
 
-            playerNames = new PlayerNames(getServer());
             providers = new Providers(this);
             queries = new ProtectionQueries(this);
-            texts = new Texts(this, playerNames);
             trading = new Trading(this, lands, store);
             management = new Management(this, lands, trading, playerNames);
             leases = new dev.toka.land.lease.Leases(this, new dev.toka.land.lease.LeaseBook(store));
@@ -83,14 +83,14 @@ public final class Main extends PluginBase {
             legacyLink.connect();
             registerCommand();
             getServer().getScheduler().scheduleRepeatingTask(this, () -> {
-                if (!lands.healthy()) lands.recover().thenAccept(ok -> { if (ok) getLogger().info("領地資料已從儲存重新讀取，恢復運作。"); });
+                if (!lands.healthy()) lands.recover().thenAccept(ok -> { if (ok) texts.info("log.recovered"); });
                 trading.maintain();
                 if (leases != null && ownership) leases.maintain();
             }, 200);
-            getLogger().info("§b載入領地共 §a" + lands.snapshot().index().all().size() + " §b個");
+            texts.info("log.loaded", lands.snapshot().index().all().size());
         } catch (Exception error) {
             ready = false;
-            getLogger().error("Land 未能載入；為避免以空資料覆蓋原資料，插件將停用。", error);
+            texts.error("log.loadFailed", error);
             getServer().getPluginManager().disablePlugin(this);
         }
     }
@@ -111,12 +111,12 @@ public final class Main extends PluginBase {
         plugins.registerEvents(new PvpListener(this), this);
         plugins.registerEvents(new NaturalChangeListener(this), this);
         var explosions = new ExplosionProtectionListener(Main::ownsLand, queries::cancelUnknownBlastRange,
-                queries::cancelEntityExplosion, () -> getServer().getTick(), line -> getLogger().warning(line));
+                queries::cancelEntityExplosion, () -> getServer().getTick(), key -> texts.warn(key));
         plugins.registerEvents(explosions, this);
         getServer().getScheduler().scheduleRepeatingTask(this, explosions::prune, 20);
         if (!getConfig().getBoolean("selection.enabled", true)) return;
         var item = cn.nukkit.item.Item.fromString(getConfig().getString("selection.tool", "290:0"));
-        if (item.getId() == 0) { getLogger().warning("選地工具設定無效，已停用選區點擊；請檢查 selection.tool。"); return; }
+        if (item.getId() == 0) { texts.warn("log.selectionToolInvalid"); return; }
         selectionTool = new SelectionToolListener(this, item);
         plugins.registerEvents(selectionTool, this);
     }
@@ -127,31 +127,53 @@ public final class Main extends PluginBase {
         var commands = getServer().getCommandMap();
         var existing = commands.getCommand("land");
         if (existing != null && existing != command) {
-            getLogger().warning("/land 已由其他插件註冊；請先停用該入口再重啟。此次不註冊替代指令。");
+            texts.warn("log.commandTaken");
             command = null;
         } else if (!(commands.register("tokaLand", command) && commands.getCommand("land") == command)) {
-            getLogger().error("無法註冊根指令 /land；請檢查指令衝突。未啟用其他替代入口。");
+            texts.warn("log.commandFailed");
             command = null;
         }
     }
 
     @Override public void onDisable() {
         ready = false;
+        try {
+            closeAll();
+        } finally {
+            if (instance == this) instance = null;
+        }
+    }
+
+    private void closeAll() {
         if (command != null) {
             var commands = getServer().getCommandMap();
             commands.getCommands().entrySet().removeIf(entry -> entry.getValue() == command);
             command.unregister(commands);
         }
         if (topbar != null) topbar.removeAll();
+        // Leases first: a rent still in flight must not write into a store that is closing.
+        if (leases != null) leases.close();
         try {
             if (trading != null) trading.close();
             if (lands != null) lands.close();
         } catch (IOException error) {
-            getLogger().error("Land 寫入工作尚未完成，保留儲存鎖直到程序結束。", error);
+            texts.error("log.writePending", error);
             return;
         }
-        if (store != null) try { store.close(); } catch (IOException error) { getLogger().error("關閉 Land 儲存庫失敗。", error); }
-        if (instance == this) instance = null;
+        if (store != null) try { store.close(); } catch (IOException error) { texts.error("log.storeCloseFailed", error); }
+    }
+
+    /** /land reload: reads config and language files again and rebuilds what was built from them. */
+    public void reloadSettings() {
+        reloadConfig();
+        var config = getConfig();
+        explosionRules = ExplosionRules.parse(config.getString("protection.explosions.mode", "cancel-whole"),
+                config.getBoolean("protection.explosions.environment-protection", true),
+                config.getInt("protection.explosions.attribution-max-depth", 32));
+        ownership = config.getBoolean("ownership.active", false);
+        trading.reloadPricing();
+        facilities.reload(config);
+        texts.clear();
     }
 
     // ---- State and internal accessors -------------------------------------------------------------------------
@@ -251,7 +273,6 @@ public final class Main extends PluginBase {
         if (main == null) throw new IllegalStateException("Land unavailable");
         main.requirePrimaryThread();
         main.maintenanceLocked = locked;
-        main.getLogger().info("Land maintenance lock=" + locked);
     }
 
     /** Called by tokaWorlds after renaming a world; claims and teleport points follow. Completes with the number of claims changed. */

@@ -24,14 +24,15 @@ public final class LandCommand extends Command {
         this.help=new HelpPages("land",List.of(
             new HelpPages.Section("read","tokaland.use",List.of("menu","info","list")),
             new HelpPages.Section("manage","tokaland.use",List.of("select","tpl","set","rename","give","type","group","del","note")),
-            new HelpPages.Section("admin","tokaland.admin",List.of("grant","refund","reset","clear","fac","facHelp")),
+            new HelpPages.Section("sub","tokaland.use",List.of("sub","leaseMenu","leaseOffer","leaseSet","leaseCancel","leaseRent","leaseRelease","leaseInfo","leaseList")),
+            new HelpPages.Section("admin","tokaland.admin",List.of("grant","refund","reset","clear","reload","fac","facHelp")),
             new HelpPages.Section("facility","tokaland.admin",List.of("facCreate","facList","facDel","facType","facMode","facLock")),
             new HelpPages.Section("inspect","tokaland.inspect",List.of("status","adminList","adminInfo"))),(sender,key,args)->plugin.texts().text(sender,key,args));
         setPermission("tokaland.use;tokaland.inspect");
         getCommandParameters().clear();
         addCommandParameters("summary",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandReadAction",new String[]{"status"}))});
         addCommandParameters("help",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandHelpAction",new String[]{"help"})),
-            CommandParameter.newEnum("section",true,new CommandEnum("TokaLandHelpSection",new String[]{"read","manage","admin","facility","inspect"})),CommandParameter.newType("page",true,CommandParamType.INT)});
+            CommandParameter.newEnum("section",true,new CommandEnum("TokaLandHelpSection",new String[]{"read","manage","sub","admin","facility","inspect"})),CommandParameter.newType("page",true,CommandParamType.INT)});
         addCommandParameters("set",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandSetAction",new String[]{"set"})),CommandParameter.newType("name",CommandParamType.STRING)});
         addCommandParameters("tpl",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandTplAction",new String[]{"tpl"})),CommandParameter.newType("claim",true,CommandParamType.STRING)});
         for(String action:List.of("rename","give","type"))addCommandParameters(action,new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLand"+action,new String[]{action})),
@@ -57,8 +58,9 @@ public final class LandCommand extends Command {
             CommandParameter.newEnum("sub",new CommandEnum("TokaLandFacilitySubmode",new String[]{"mode"})),CommandParameter.newType("name",CommandParamType.STRING),
             CommandParameter.newEnum("value",new CommandEnum("TokaLandFacilityModeValue",new String[]{"open","protect","private"}))});
         addCommandParameters("menu",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandMenuAction",new String[]{"menu","gui"}))});
-        addCommandParameters("lease",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandLeaseAction",new String[]{"lease"})),CommandParameter.newType("terms",true,CommandParamType.RAWTEXT)});
+        addLeaseParameters();
         addCommandParameters("sub",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandSubAction",new String[]{"sub"})),CommandParameter.newType("name",CommandParamType.STRING)});
+        addCommandParameters("reload",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandReloadAction",new String[]{"reload"}))});
         addCommandParameters("localInfo",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandLocalInfoAction",new String[]{"info"}))});
         addCommandParameters("ownerList",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandOwnerListAction",new String[]{"list"})),CommandParameter.newType("player",true,CommandParamType.TARGET)});
         addCommandParameters("grant",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandGrantAction",new String[]{"grant"})),
@@ -69,10 +71,30 @@ public final class LandCommand extends Command {
         addCommandParameters("clear",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandClearAction",new String[]{"clear"})),CommandParameter.newEnum("step",true,new CommandEnum("TokaLandClearStep",new String[]{"confirm"}))});
         addCommandParameters("info",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandInfoAction",new String[]{"info"})),CommandParameter.newType("claimId",CommandParamType.STRING)});
     }
+    /** One overload per lease subcommand so the client completes the words and number slots; claim names stay free text. */
+    private void addLeaseParameters(){
+        var word=new CommandEnum("TokaLandLeaseAction",new String[]{"lease"});
+        java.util.function.Function<String,CommandParameter> sub=name->CommandParameter.newEnum("sub",new CommandEnum("TokaLandLease_"+name,new String[]{name}));
+        var claim=CommandParameter.newType("claim",CommandParamType.STRING);
+        addCommandParameters("leaseMenu",new CommandParameter[]{CommandParameter.newEnum("action",word)});
+        addCommandParameters("leaseOffer",new CommandParameter[]{CommandParameter.newEnum("action",word),sub.apply("offer"),claim,
+            CommandParameter.newType("rent",CommandParamType.INT),CommandParameter.newType("days",true,CommandParamType.INT)});
+        addCommandParameters("leaseSet",new CommandParameter[]{CommandParameter.newEnum("action",word),sub.apply("set"),claim,
+            CommandParameter.newEnum("key",new CommandEnum("TokaLandLeaseKey",new String[]{"max","grace","renew","discount","rent"})),CommandParameter.newType("value",CommandParamType.STRING)});
+        for(String name:List.of("cancel","release","info"))addCommandParameters("lease"+name,new CommandParameter[]{CommandParameter.newEnum("action",word),sub.apply(name),claim});
+        addCommandParameters("leaseRent",new CommandParameter[]{CommandParameter.newEnum("action",word),sub.apply("rent"),claim,CommandParameter.newType("periods",true,CommandParamType.INT),
+            CommandParameter.newEnum("start",true,new CommandEnum("TokaLandLeaseStart",new String[]{"start"})),CommandParameter.newType("startDate",true,CommandParamType.STRING),
+            CommandParameter.newEnum("end",true,new CommandEnum("TokaLandLeaseEnd",new String[]{"end"})),CommandParameter.newType("endDate",true,CommandParamType.STRING)});
+        addCommandParameters("leaseList",new CommandParameter[]{CommandParameter.newEnum("action",word),sub.apply("list")});
+    }
     @Override public boolean execute(CommandSender sender,String label,String[] args) {
         if(!testPermissionSilent(sender)){send(sender,"command.denied");return true;}
         String action=args.length==0?"help":args[0].toLowerCase(Locale.ROOT);
         if(action.equals("help")){help.show(sender,args.length>1?java.util.Arrays.copyOfRange(args,1,args.length):new String[0]);return true;}
+        if(action.equals("reload")&&args.length==1){
+            if(!sender.hasPermission("tokaland.admin")){send(sender,"command.denied");return true;}
+            plugin.reloadSettings();send(sender,"command.reloaded");return true;
+        }
         if(!plugin.isReady()){send(sender,"ui.unavailable","Land");return true;}
         if(Set.of("rename","give","type","group","grp","del").contains(action)
                 ||action.equals("tpl")&&sender instanceof Player p&&(args.length>1||!plugin.management().claimsAround(p).isEmpty()))return manage(sender,action,args);

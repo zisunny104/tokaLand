@@ -57,7 +57,7 @@ public final class ExplosionProtectionListener implements Listener {
             // Without the core's effective force, the entity damage/knockback range is unknown.
             event.setCancelled();
             if(!warnedMissingForce){warnedMissingForce=true;warning.accept(
-                "已取消缺少爆炸範圍資料的實體爆炸；請檢查自訂爆炸是否呼叫 EntityExplosionPrimeEvent。" );}
+                "log.blastForceMissing");}
             return;
         }
         if(check.cancel(event.getEntity(),event.getPosition(),capture.force()))event.setCancelled();
@@ -69,7 +69,7 @@ public final class ExplosionProtectionListener implements Listener {
         // The core event does not expose force or the entity-damage/knockback AABB.
         event.setCancelled();
         if(!warnedMissingBlockRange){warnedMissingBlockRange=true;warning.accept(
-            "已取消缺少完整影響範圍資料的區塊爆炸；目前採保護優先策略。" );}
+            "log.blastRangeMissing");}
     }
 
     /** Remove abandoned captures from cancelled or otherwise unused prime events. */

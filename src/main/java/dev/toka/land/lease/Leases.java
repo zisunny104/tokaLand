@@ -36,6 +36,7 @@ public final class Leases {
     private final Main plugin;
     private final LeaseBook book;
     private final AtomicBoolean ticking = new AtomicBoolean();
+    private volatile boolean closed;
     private volatile Method transfer, statusOf;
     private volatile Object cause;
     private Plugin economy;
@@ -44,6 +45,13 @@ public final class Leases {
         this.plugin = plugin;
         this.book = book;
     }
+
+    /** After this nothing is written to the lease book, so work still in flight cannot touch a store that is closing. */
+    public void close() { closed = true; }
+
+    public Lease leaseOf(UUID claimId) { return book.get(claimId); }
+
+    public List<Lease> allLeases() { return List.copyOf(book.all()); }
 
     private String currency() { return plugin.getConfig().getString("lease.currency", "money"); }
 
@@ -106,6 +114,7 @@ public final class Leases {
     }
 
     private void persist(Lease lease) {
+        if (closed) throw new CompletionException(new IllegalStateException("CLOSED"));
         try { book.save(lease); } catch (IOException failure) { throw new CompletionException(failure); }
     }
 
@@ -158,7 +167,10 @@ public final class Leases {
 
     // ---- offering, renting, leaving ----
 
-    public void offer(Player player, String subName, long rent, Integer days) {
+    public void offer(Player player, String subName, long rent, Integer days) { offer(player, subName, rent, days, null); }
+
+    /** {@code terms} may be null; its fields set max periods, grace, renewal and the prepay discount of a new offer */
+    public void offer(Player player, String subName, long rent, Integer days, LeaseTerms terms) {
         var sub = named(subName).orElse(null);
         if (sub == null) { player.sendMessage(text(player, "lease.noClaim", subName)); return; }
         if (sub.parentClaimId() == null) { player.sendMessage(text(player, "lease.notSub")); return; }
@@ -182,6 +194,7 @@ public final class Leases {
             lease.maxPeriods = plugin.getConfig().getInt("lease.max-periods", 12);
             lease.graceDays = plugin.getConfig().getInt("lease.grace-days", 7);
         }
+        if (terms != null) terms.applyTo(lease);
         lease.state = Lease.VACANT;
         try { persist(lease); } catch (RuntimeException failure) { player.sendMessage(text(player, "lease.failed", rootMessage(failure))); return; }
         player.sendMessage(text(player, "lease.offered", sub.name(), rent, period == -1 ? text(player, "lease.noTerm") : period + " " + text(player, "lease.days")));
@@ -195,8 +208,8 @@ public final class Leases {
         if (!lease.lessor.equals(player.getUniqueId().toString()) && !player.hasPermission("tokaland.admin")) { player.sendMessage(text(player, "lease.notOwner")); return; }
         try {
             switch (key.toLowerCase(Locale.ROOT)) {
-                case "max" -> lease.maxPeriods = Math.max(1, Math.min(120, Integer.parseInt(value)));
-                case "grace" -> lease.graceDays = Math.max(0, Math.min(90, Integer.parseInt(value)));
+                case "max" -> lease.maxPeriods = LeaseTerms.clampPeriods(Integer.parseInt(value));
+                case "grace" -> lease.graceDays = LeaseTerms.clampGrace(Integer.parseInt(value));
                 case "renew" -> lease.autoRenew = value.equalsIgnoreCase("on") || value.equalsIgnoreCase("true");
                 case "rent" -> {
                     long rent = Long.parseLong(value);
@@ -206,7 +219,7 @@ public final class Leases {
                 case "discount" -> {
                     String[] parts = value.split(":");
                     lease.discountAfter = Math.max(0, Integer.parseInt(parts[0]));
-                    lease.discountPercent = Math.max(0, Math.min(90, Integer.parseInt(parts[1])));
+                    lease.discountPercent = LeaseTerms.clampDiscount(Integer.parseInt(parts[1]));
                 }
                 default -> { player.sendMessage(text(player, "lease.usage")); return; }
             }
@@ -221,8 +234,22 @@ public final class Leases {
         if (lease == null) { player.sendMessage(text(player, "lease.noLease")); return; }
         if (!lease.lessor.equals(player.getUniqueId().toString()) && !player.hasPermission("tokaland.admin")) { player.sendMessage(text(player, "lease.notOwner")); return; }
         if (!Lease.VACANT.equals(lease.state)) { player.sendMessage(text(player, "lease.busy")); return; }
+        if (closed) return;
         try { book.delete(sub.id()); player.sendMessage(text(player, "lease.withdrawn", sub.name())); }
         catch (IOException failure) { player.sendMessage(text(player, "lease.failed", rootMessage(failure))); }
+    }
+
+    /** Changes the rent and terms of an offer in one go (the manage window); null fields stay as they are */
+    public void update(Player player, String subName, Long rent, LeaseTerms terms) {
+        var sub = named(subName).orElse(null);
+        Lease lease = sub == null ? null : book.get(sub.id());
+        if (lease == null) { player.sendMessage(text(player, "lease.noLease")); return; }
+        if (!lease.lessor.equals(player.getUniqueId().toString()) && !player.hasPermission("tokaland.admin")) { player.sendMessage(text(player, "lease.notOwner")); return; }
+        if (rent != null && rent < 1) { player.sendMessage(text(player, "lease.badNumber")); return; }
+        if (rent != null) lease.rent = rent;
+        if (terms != null) terms.applyTo(lease);
+        try { persist(lease); player.sendMessage(text(player, "lease.changed", sub.name())); }
+        catch (RuntimeException failure) { player.sendMessage(text(player, "lease.failed", rootMessage(failure))); }
     }
 
     /** {@code start} and {@code endCap} are optional dates; with no start the term begins now */
@@ -361,15 +388,16 @@ public final class Leases {
 
     /** Called often: finishes interrupted rents, starts reserved terms, renews, and ends what has run out */
     public void maintain() {
-        if (!ticking.compareAndSet(false, true)) return;
+        if (closed || !ticking.compareAndSet(false, true)) return;
         long now = System.currentTimeMillis();
         List<CompletableFuture<?>> work = new ArrayList<>();
         for (Lease lease : List.copyOf(book.all())) {
+            if (closed) break;
             try {
                 // a sub-claim that was deleted takes its letting with it
                 if (claim(UUID.fromString(lease.claimId)).isEmpty()) {
                     book.delete(UUID.fromString(lease.claimId));
-                    plugin.getLogger().info("下級領地已不存在，移除它的租賃資料：" + lease.claimId);
+                    plugin.texts().info("log.leaseGone", lease.claimId);
                     continue;
                 }
                 switch (lease.state) {
@@ -384,10 +412,10 @@ public final class Leases {
                     }
                     default -> { }
                 }
-            } catch (RuntimeException | IOException failure) { plugin.getLogger().warning("租賃處理失敗：" + lease.claimId + " " + failure.getClass().getSimpleName()); }
+            } catch (RuntimeException | IOException failure) { plugin.texts().warn("log.leaseFailed", lease.claimId, failure.getClass().getSimpleName()); }
         }
         CompletableFuture.allOf(work.toArray(new CompletableFuture[0])).whenComplete((ignored, failure) -> {
-            if (failure != null) plugin.getLogger().warning("租賃處理未完成：" + rootMessage(failure));
+            if (failure != null) plugin.texts().warn("log.leaseIncomplete", rootMessage(failure));
             ticking.set(false);
         });
     }
@@ -429,6 +457,7 @@ public final class Leases {
     public boolean command(CommandSender sender, String[] args) {
         if (!(sender instanceof Player player) || !sender.hasPermission("tokaland.use")) { sender.sendMessage(text(sender, "command.denied")); return true; }
         try {
+            if (args.length == 1 && args[0].equalsIgnoreCase("lease")) { plugin.window().leaseMenu(player); return true; }
             if (args[0].equalsIgnoreCase("sub")) {
                 if (args.length != 2) player.sendMessage(text(player, "lease.usage")); else createSub(player, args[1]);
                 return true;

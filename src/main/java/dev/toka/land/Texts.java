@@ -14,7 +14,7 @@ import java.util.Map;
 public final class Texts {
     private final Main plugin;
     private final PlayerNames names;
-    private final Map<String, Messages> languages = new HashMap<>();
+    private final Map<String, Messages> languages = new java.util.concurrent.ConcurrentHashMap<>();
 
     Texts(Main plugin, PlayerNames names) {
         this.plugin = plugin;
@@ -32,6 +32,17 @@ public final class Texts {
     }
 
     public String text(CommandSender sender, String key, Object... args) { return message(language(sender), key, args); }
+
+    /** Drops the loaded languages so the next message re-reads the files (used by /land reload). */
+    public void clear() { languages.clear(); }
+
+    private String console(String key, Object... args) { return message(plugin.getConfig().getString("language", "zh-TW"), key, args); }
+
+    public void info(String key, Object... args) { plugin.getLogger().info(console(key, args)); }
+
+    public void warn(String key, Object... args) { plugin.getLogger().warning(console(key, args)); }
+
+    public void error(String key, Throwable cause, Object... args) { plugin.getLogger().error(console(key, args), cause); }
 
     public void sendSelectionPoint(Player player, boolean first, SelectionToolListener.Point point) {
         player.sendMessage(text(player, first ? "selection.first" : "selection.second", point.world(), point.x(), point.y(), point.z()));

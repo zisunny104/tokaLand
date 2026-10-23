@@ -46,7 +46,7 @@ final class TopbarService implements Listener {
             pin = api.getMethod("pin", Player.class, String.class, String.class, int.class, int.class, float.class, String.class);
             unpin = api.getMethod("unpin", Player.class, String.class);
         } catch (ReflectiveOperationException | LinkageError error) {
-            plugin.getLogger().warning("tokaDisplay API 不相容，領地頂部提示停用：" + error.getClass().getSimpleName());
+            plugin.texts().warn("log.topbarIncompatible", error.getClass().getSimpleName());
         }
     }
 
@@ -85,7 +85,7 @@ final class TopbarService implements Listener {
         if (text.equals(shown.put(player.getUniqueId(), text))) return;
         try { pin.invoke(null, player, KEY, text, 0, 20, -1f, ""); }
         catch (ReflectiveOperationException | LinkageError error) {
-            plugin.getLogger().warning("tokaDisplay API 失效，領地頂部提示停用：" + error.getClass().getSimpleName());
+            plugin.texts().warn("log.topbarFailed", error.getClass().getSimpleName());
             pin = null;
         }
     }

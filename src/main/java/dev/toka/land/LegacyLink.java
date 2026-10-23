@@ -31,15 +31,15 @@ final class LegacyLink implements Listener {
                 listening = true;
             }
         } catch (ReflectiveOperationException | LinkageError unavailable) {
-            plugin.getLogger().warning("無法連上 tokaProfiles 的舊名稱取回：" + unavailable.getClass().getSimpleName());
+            plugin.texts().warn("log.legacyUnavailable", unavailable.getClass().getSimpleName());
         }
     }
 
     private void replace(Map<String, UUID> resolved) {
         if (resolved.isEmpty()) return;
         plugin.lands().replaceLegacyNames(resolved).whenComplete((count, failure) -> {
-            if (failure != null) plugin.getLogger().warning("替換領地的舊名稱失敗：" + failure.getCause());
-            else if (count > 0) plugin.getLogger().info("§b領地的舊名稱已換成帳號：§a" + count + " §b筆");
+            if (failure != null) plugin.texts().warn("log.legacyFailed", failure.getCause());
+            else if (count > 0) plugin.texts().info("log.legacyReplaced", count);
         });
     }
 

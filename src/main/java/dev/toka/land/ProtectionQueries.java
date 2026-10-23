@@ -74,7 +74,7 @@ public final class ProtectionQueries {
         };
         var decision = rules.evaluate(index, bounds, attribution, permitted);
         boolean cancel = plugin.maintenanceLocked() && !decision.affectedClaims().isEmpty() || decision.cancel();
-        if (cancel) plugin.getLogger().info("已攔截領地範圍內爆炸：" + decision.reason() + "，命中領地=" + decision.affectedClaims().size());
+        if (cancel) plugin.texts().info("log.blastCancelled", decision.reason(), decision.affectedClaims().size());
         return cancel;
     }
 

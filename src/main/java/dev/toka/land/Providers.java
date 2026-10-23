@@ -76,7 +76,7 @@ public final class Providers {
         try { return provider.callback().test(player, subject.id()); }
         catch (RuntimeException | LinkageError failure) {
             groups.remove(subject.provider());
-            plugin.getLogger().warning("Land 群組授權服務失效，維持拒絕：" + failure.getClass().getSimpleName());
+            plugin.texts().warn("log.groupProviderFailed", failure.getClass().getSimpleName());
             return false;
         }
     }
@@ -91,7 +91,7 @@ public final class Providers {
         try { return provider.callback().test(player, request.toString()); }
         catch (RuntimeException | LinkageError failure) {
             authority = null;
-            plugin.getLogger().warning("Land 外部保護授權失效，維持拒絕：" + failure.getClass().getSimpleName());
+            plugin.texts().warn("log.authorityFailed", failure.getClass().getSimpleName());
             return false;
         }
     }
@@ -122,7 +122,7 @@ public final class Providers {
                 if (System.currentTimeMillis() - pricingLostSince < grace) throw new IllegalStateException("PURCHASE_POLICY_UNAVAILABLE");
                 if (!fallbackLogged) {
                     fallbackLogged = true;
-                    plugin.getLogger().warning("購地規則提供者已消失超過寬限時間，改用 Land 自己的預設價格與規則；它重新註冊後會立即接手。");
+                    plugin.texts().warn("log.pricingGone");
                 }
             }
             return Optional.empty();
