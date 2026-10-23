@@ -57,9 +57,29 @@ public final class LandWindow implements Listener {
         var window = new FormWindowSimple(claim.displayName(language), text(player, "tools.info", claim.id(), claim.displayName(language),
                 plugin.texts().ownerText(claim, language), claim.type(),
                 claim.accessPolicy().mode() + (claim.accessPolicy().locked() ? "+LOCK" : ""), claim.selections().size()));
+        // The way there is tokaPortal's, and only a claim with a teleport point can be gone to.
+        boolean teleport = claim.details().teleport() != null && portal() != null;
+        if (teleport) window.addButton(new ElementButton(text(player, "window.teleport")));
         window.addButton(new ElementButton(text(player, "window.back")));
         window.addButton(new ElementButton(text(player, "window.close")));
-        show(player, window, index -> { if (index == 0) list(player, page); });
+        show(player, window, index -> {
+            if (teleport && index == 0) goTo(player, claim);
+            else if (index == (teleport ? 1 : 0)) list(player, page);
+        });
+    }
+
+    private java.lang.reflect.Method portal() {
+        var found = plugin.getServer().getPluginManager().getPlugin("tokaPortal");
+        if (found == null || !found.isEnabled()) return null;
+        try { return Class.forName("dev.toka.pl.tokaPortal.utils.Portal", true, found.getClass().getClassLoader()).getMethod("toLandClaim", Player.class, String.class); }
+        catch (ReflectiveOperationException | LinkageError missing) { return null; }
+    }
+
+    private void goTo(Player player, LandClaim claim) {
+        var go = portal();
+        if (go == null) return;
+        try { go.invoke(null, player, claim.id().toString()); }
+        catch (ReflectiveOperationException | LinkageError failed) { player.sendMessage(text(player, "window.teleportFailed")); }
     }
 
     @EventHandler public void onResponse(PlayerFormRespondedEvent event) {

@@ -43,6 +43,8 @@ window:
   next: "下一頁"
   back: "返回"
   close: "關閉"
+  teleport: "傳送到這塊領地"
+  teleportFailed: "§c現在無法傳送。"
 facility:
   created: "§a[設施] 已建立 ${0}（${1}）。"
   extended: "§a[設施] 已為 ${0} 追加選區。"

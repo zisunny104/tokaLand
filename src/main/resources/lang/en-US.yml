@@ -43,6 +43,8 @@ window:
   next: "Next"
   back: "Back"
   close: "Close"
+  teleport: "Teleport here"
+  teleportFailed: "§cYou cannot be teleported right now."
 facility:
   created: "§a[Facility] Created ${0} (${1})."
   extended: "§a[Facility] Added a part to ${0}."
