@@ -43,7 +43,7 @@ window:
   next: "Next"
   back: "Back"
   close: "Close"
-  teleport: "Teleport here"
+  teleport: "Teleport"
   teleportFailed: "§cYou cannot be teleported right now."
 facility:
   created: "§a[Facility] Created ${0} (${1})."
