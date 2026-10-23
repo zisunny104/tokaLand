@@ -22,7 +22,7 @@ public final class DatasetRepository {
         current=null;
         var manifest=store.load("dataset");
         if(manifest.isEmpty()){
-            // Native 0.1 prototype records. No zero SQL or legacy plugin format is read here.
+            // Native 0.1 prototype records. No SQL or legacy plugin format is read here.
             var claims=new LandRepository(store).loadAll();
             current=new Snapshot(claims.isEmpty()?"EMPTY":digest(GSON.toJsonTree(claims)),new LandIndex(claims));
             currentKeys=Map.of();

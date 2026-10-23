@@ -77,7 +77,7 @@ public final class Leases {
         if (!connect()) return CompletableFuture.completedFuture("UNAVAILABLE");
         try {
             CompletableFuture<?> future = (CompletableFuture<?>) transfer.invoke(null, from, to, currency(), amount, cause, operation);
-            return future.handle((result, fault) -> {
+            return future.orTimeout(30, java.util.concurrent.TimeUnit.SECONDS).handle((result, fault) -> {
                 if (fault != null || result == null) return "FAILED";
                 try { return String.valueOf(statusOf.invoke(result)); } catch (ReflectiveOperationException error) { return "FAILED"; }
             });
@@ -93,6 +93,11 @@ public final class Leases {
     }
 
     private Optional<UUID> ownerOf(LandClaim claim) { return ClaimAccess.effectiveOwner(plugin.index(), claim.id()); }
+
+    /** The rent goes to whoever owns the upper-level claim now, so a claim that changed hands pays its new owner */
+    private UUID lessorOf(Lease lease) {
+        return claim(UUID.fromString(lease.claimId)).flatMap(sub -> claim(sub.parentClaimId())).flatMap(this::ownerOf).orElse(UUID.fromString(lease.lessor));
+    }
 
     private CompletableFuture<String> setTenant(LandClaim current, UUID tenant, String tenantName) {
         LandClaim after = tenant == null ? current.withTenancy(null, null, true, true, List.of())
@@ -225,7 +230,7 @@ public final class Leases {
         var sub = named(subName).orElse(null);
         Lease lease = sub == null ? null : book.get(sub.id());
         if (lease == null || !Lease.VACANT.equals(lease.state)) { player.sendMessage(text(player, "lease.notVacant")); return; }
-        UUID lessor = UUID.fromString(lease.lessor);
+        UUID lessor = lessorOf(lease);
         if (lessor.equals(player.getUniqueId())) { player.sendMessage(text(player, "lease.ownLand")); return; }
         if (lease.perpetual()) periods = 1;
         if (periods < 1 || periods > lease.maxPeriods) { player.sendMessage(text(player, "lease.periods", lease.maxPeriods)); return; }
@@ -245,10 +250,11 @@ public final class Leases {
         lease.pendingAmount = amount;
         lease.operation = "lease:" + sub.id() + ":" + now;
         lease.paidUntil = 0;
+        lease.lastTry = now;
         try { persist(lease); } catch (RuntimeException failure) { player.sendMessage(text(player, "lease.failed", rootMessage(failure))); return; }
         player.sendMessage(text(player, "lease.paying", amount));
         UUID tenant = player.getUniqueId();
-        complete(lease).whenComplete((status, error) -> {
+        complete(lease, true).whenComplete((status, error) -> {
             if (error != null) tell(tenant, "lease.failed", rootMessage(error));
             else if (status.equals("OK")) tell(tenant, lease.state.equals(Lease.RESERVED) ? "lease.reserved" : "lease.rented", sub.name(), formatTime(lease.shownEnd()));
             else if (status.equals("INSUFFICIENT_FUNDS")) tell(tenant, "lease.insufficient", amount);
@@ -257,11 +263,14 @@ public final class Leases {
     }
 
     /** Finishes a PENDING rent: the payment (once), then the sub-claim goes to the tenant, now or at the start date. A payment refused for good puts the offer back. */
-    private CompletableFuture<String> complete(Lease lease) {
-        UUID tenant = UUID.fromString(lease.tenant), lessor = UUID.fromString(lease.lessor);
+    private CompletableFuture<String> complete(Lease lease, boolean firstTry) {
+        UUID tenant = UUID.fromString(lease.tenant), lessor = lessorOf(lease);
         return pay(tenant, lessor, lease.pendingAmount, lease.operation).thenCompose(status -> {
             if (!status.equals("OK")) {
-                if (!status.equals("UNAVAILABLE") && !status.equals("FAILED")) {
+                // refused for good, or (on the first try) never sent because the economy is down: nothing moved, the offer is open again.
+                // After a stop it stays pending: the money may have moved, and the same operation ID settles it.
+                boolean nothingMoved = !status.equals("FAILED") && (firstTry || !status.equals("UNAVAILABLE"));
+                if (nothingMoved) {
                     lease.state = Lease.VACANT;
                     lease.tenant = null;
                     lease.tenantName = null;
@@ -301,7 +310,9 @@ public final class Leases {
         if (lease == null || lease.tenant == null) { player.sendMessage(text(player, "lease.noLease")); return; }
         boolean tenant = lease.tenant.equals(player.getUniqueId().toString());
         if (!tenant && !lease.lessor.equals(player.getUniqueId().toString()) && !player.hasPermission("tokaland.admin")) { player.sendMessage(text(player, "lease.notOwner")); return; }
-        end(lease, tenant).whenComplete((ok, error) -> plugin.getServer().getScheduler().scheduleTask(plugin,
+        CompletableFuture<String> refund = lease.state.equals(Lease.RESERVED) && System.currentTimeMillis() < lease.startAt
+                ? pay(lessorOf(lease), UUID.fromString(lease.tenant), lease.pendingAmount, lease.operation + ":refund") : CompletableFuture.completedFuture("OK");
+        refund.thenCompose(status -> status.equals("OK") ? end(lease, tenant) : CompletableFuture.<Void>failedFuture(new IllegalStateException(status))).whenComplete((ok, error) -> plugin.getServer().getScheduler().scheduleTask(plugin,
                 () -> player.sendMessage(error == null ? text(player, "lease.released", sub.name()) : text(player, "lease.failed", rootMessage(error)))));
     }
 
@@ -363,7 +374,7 @@ public final class Leases {
                 }
                 switch (lease.state) {
                     case Lease.PENDING -> {
-                        if (now - lease.lastTry >= RETRY_MILLIS) { lease.lastTry = now; work.add(complete(lease)); }
+                        if (now - lease.lastTry >= RETRY_MILLIS) { lease.lastTry = now; work.add(complete(lease, false)); }
                     }
                     case Lease.RESERVED -> { if (now >= lease.startAt) work.add(start(lease)); }
                     case Lease.LEASED -> { if (!lease.perpetual() && now >= lease.paidUntil) work.add(renew(lease, now)); }
@@ -384,8 +395,8 @@ public final class Leases {
     /** At the end of what is paid: another period if the lease renews and the cap allows, else the term is over; money short means grace */
     private CompletableFuture<Void> renew(Lease lease, long now) {
         boolean capped = lease.endCap != 0 && lease.paidUntil + lease.periodMillis() > lease.endCap;
-        if (!lease.autoRenew || capped) return end(lease, false);
-        UUID tenant = UUID.fromString(lease.tenant), lessor = UUID.fromString(lease.lessor);
+        if (!lease.autoRenew || capped) return now < lease.paidUntil + Lease.DAY ? CompletableFuture.completedFuture(null) : end(lease, false);
+        UUID tenant = UUID.fromString(lease.tenant), lessor = lessorOf(lease);
         return pay(tenant, lessor, lease.rent, "lease:" + lease.claimId + ":renew:" + lease.paidUntil).thenAccept(status -> {
             if (status.equals("OK")) {
                 lease.paidUntil += lease.periodMillis();

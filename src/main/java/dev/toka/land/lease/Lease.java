@@ -40,5 +40,4 @@ public final class Lease {
 
     public static Lease fromJson(JsonObject json) { return GSON.fromJson(json, Lease.class); }
 
-    public Lease copy() { return fromJson(toJson()); }
 }

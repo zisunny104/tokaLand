@@ -5,7 +5,7 @@ import java.util.Collection;
 
 /**
  * Base land prices. Discounts and taxes are not decided here: a provider supplies them per purchase
- * (TODO(migration): zero until tokaEconomy owns those rules). Amounts are whole units, truncated like the legacy rules.
+ * (tokaRegions does). Amounts are whole units, truncated like the legacy rules.
  */
 public record LandPricing(String currency, double perBlock, double perBlockFlat, double refundRate) {
     public LandPricing {
