@@ -62,7 +62,7 @@ public final class Main extends PluginBase {
             lands = new LandService(new DatasetRepository(store));
             // The cutover tool flips ownership.active only after the previous manager is disabled; Land never probes other plugins.
             ownership = config.getBoolean("ownership.active", false);
-            if (ownership) getLogger().warning("Land 已接手領地保護；請確認舊的領地管理者已停用，否則兩邊會同時攔截。");
+            if (ownership) getLogger().info("Land 領地保護運作中（ownership.active: true）。");
             else getLogger().info("Land 待命中：ownership.active 為 false，不攔截任何事件。");
 
             playerNames = new PlayerNames(getServer());
