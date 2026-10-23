@@ -60,7 +60,7 @@ selection:
   second: "§a選區第二點：${0} (${1}, ${2}, ${3})"
 ui:
   land: "§8[領地]§r${0} §8[擁有者]§r${1}"
-  pending: "${0}（待身分確認）"
+  pending: "${0} §8legacy§r"
   publicOwner: "公用地籍"
   inheritedOwner: "未指定擁有者"
   denied: "§c[領地] 此操作未獲允許：${0}"

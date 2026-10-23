@@ -60,7 +60,7 @@ selection:
   second: "§aSelection point 2: ${0} (${1}, ${2}, ${3})"
 ui:
   land: "§8[Land]§r${0} §8[Owner]§r${1}"
-  pending: "${0} (identity pending)"
+  pending: "${0} §8legacy§r"
   publicOwner: "Public land"
   inheritedOwner: "Unassigned owner"
   denied: "§c[Land] This operation is not permitted: ${0}"
