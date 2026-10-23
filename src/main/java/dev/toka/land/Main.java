@@ -43,7 +43,7 @@ public final class Main extends PluginBase {
     private SelectionToolListener selectionTool;
     private LandCommand command;
     private volatile boolean ready;
-    private boolean ownership;
+    private volatile boolean ownership;
     private volatile boolean maintenanceLocked;
 
     @Override public void onEnable() {
@@ -152,6 +152,24 @@ public final class Main extends PluginBase {
     public static Main instance() { return instance; }
     public boolean isReady() { return ready && lands != null && lands.healthy(); }
     /** True only when Land is healthy and has taken over protection. */
+    /**
+     * For the cutover tool, by reflection: Land takes over claim protection now and keeps doing so after a restart. Only the
+     * tool calls it, and only after the previous manager is switched off, so two managers never act together.
+     */
+    public static void activateOwnership() throws java.io.IOException { setOwnership(true); }
+
+    /** Undoes {@link #activateOwnership()}, for when the cutover has to be taken back. */
+    public static void deactivateOwnership() throws java.io.IOException { setOwnership(false); }
+
+    private static synchronized void setOwnership(boolean on) throws java.io.IOException {
+        Main main = instance;
+        if (main == null || !main.isReady()) throw new IllegalStateException("Land unavailable");
+        ConfigEdit.setBoolean(main.getDataFolder().toPath().resolve("config.yml"), "ownership", "active", on);
+        main.getConfig().set("ownership.active", on);
+        main.ownership = on;
+        main.getLogger().info(on ? "Land 已接手領地保護（ownership.active: true）。" : "Land 已交還領地保護（ownership.active: false）。");
+    }
+
     public static boolean ownsLand() { return instance != null && instance.isReady() && instance.ownership; }
     public boolean maintenanceLocked() { return maintenanceLocked; }
     public Providers providers() { return providers; }
