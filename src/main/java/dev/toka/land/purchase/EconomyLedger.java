@@ -6,8 +6,10 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Soft dependency on tokaEconomy's durable payments. With a treasury account, money moves in one fee-free transfer;
- * without one the price leaves the economy and refunds are created, as before.
+ * Soft dependency on tokaEconomy's durable payments. The caller decides once, when the price is quoted, whether a treasury
+ * takes part and writes it in the journal; every step then follows that record. With a treasury account money moves in one
+ * fee-free transfer; without one the price leaves the economy and refunds are created, as before. A step never switches
+ * from one to the other half-way, so the treasury can neither be paid out of money it never received nor create money.
  */
 public final class EconomyLedger implements PurchaseCoordinator.Ledger {
     private final Method withdraw,refundWithdrawal,deposit,status;
@@ -35,28 +37,40 @@ public final class EconomyLedger implements PurchaseCoordinator.Ledger {
         saleCause=of.invoke(null,"land-sale","tokaLand");
     }
     public void disconnect(){available=false;}
-    /** A treasury is used only when tokaEconomy can move money between accounts and the account exists; otherwise there is none. */
+    /** A treasury can be used only when tokaEconomy can move money between accounts and the account exists. */
     private boolean usable(UUID account){
         if(account==null||transfer==null||hasAccount==null||!available)return false;
         try{return (Boolean)hasAccount.invoke(null,account);}
         catch(ReflectiveOperationException|LinkageError failure){return false;}
     }
+    /** Why a journalled treasury cannot be used right now: gone for good, or just not reachable at the moment. */
+    private String treasuryProblem(UUID account){
+        if(transfer==null||hasAccount==null||!available)return "UNAVAILABLE";
+        try{return (Boolean)hasAccount.invoke(null,account)?null:"TREASURY_UNAVAILABLE";}
+        catch(ReflectiveOperationException|LinkageError failure){return "UNAVAILABLE";}
+    }
+    private CompletableFuture<String> viaTreasury(UUID account,java.util.function.Supplier<CompletableFuture<String>> move){
+        String problem=treasuryProblem(account);
+        return problem!=null?CompletableFuture.completedFuture(problem):move.get();
+    }
     @Override public CompletableFuture<String> debit(UUID player,UUID beneficiary,String currency,long amount,String operation){
-        return !usable(beneficiary)?invoke(withdraw,player,currency,amount,purchaseCause,operation)
-            :invoke(transfer,player,beneficiary,currency,amount,purchaseCause,operation);
+        return beneficiary==null?invoke(withdraw,player,currency,amount,purchaseCause,operation)
+            :viaTreasury(beneficiary,()->invoke(transfer,player,beneficiary,currency,amount,purchaseCause,operation));
     }
     @Override public CompletableFuture<String> refund(UUID player,UUID beneficiary,String currency,long amount,String operation){
-        return !usable(beneficiary)?invoke(refundWithdrawal,player,purchaseCause,operation,compensateCause)
-            :invoke(transfer,beneficiary,player,currency,amount,compensateCause,"refund:"+operation);
+        return beneficiary==null?invoke(refundWithdrawal,player,purchaseCause,operation,compensateCause)
+            :viaTreasury(beneficiary,()->invoke(transfer,beneficiary,player,currency,amount,compensateCause,"refund:"+operation));
     }
     @Override public CompletableFuture<String> credit(UUID player,UUID source,String currency,long amount,String operation){
-        return !usable(source)?invoke(deposit,player,currency,amount,saleCause,operation)
-            :invoke(transfer,source,player,currency,amount,saleCause,operation);
+        return source==null?invoke(deposit,player,currency,amount,saleCause,operation)
+            :viaTreasury(source,()->invoke(transfer,source,player,currency,amount,saleCause,operation));
     }
     @Override public boolean accepts(UUID account){return usable(account);}
     @Override public String covers(UUID account,String currency,long amount){
         if(!available)return "UNAVAILABLE";
-        if(!usable(account))return "OK";
+        if(account==null)return "OK";
+        String problem=treasuryProblem(account);
+        if(problem!=null)return problem;
         try{return status.invoke(has.invoke(null,account,currency,amount)).toString();}
         catch(ReflectiveOperationException|LinkageError failure){return "UNAVAILABLE";}
     }

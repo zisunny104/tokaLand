@@ -121,4 +121,19 @@ public class TreasuryFlowTest {
         assertEquals(claim.id(), none.id());
         assertEquals(claim.selections(), none.selections());
     }
+    @Test public void aTreasuryThatIsGoneRejectsThePurchaseBeforeAnyMoneyMoves() throws Exception {
+        UUID treasury = UUID.randomUUID();
+        var claim = claim(0, new ClaimDetails(UUID.randomUUID(), "Owner", null, true, 60L, treasury));
+        PurchaseCoordinator.Ledger gone = new PurchaseCoordinator.Ledger() {
+            public CompletableFuture<String> debit(UUID p, UUID b, String c, long a, String op) { return CompletableFuture.completedFuture("TREASURY_UNAVAILABLE"); }
+            public CompletableFuture<String> refund(UUID p, UUID b, String c, long a, String op) { throw new AssertionError("nothing was paid"); }
+        };
+        try (var store = DocumentStore.open(new StoreConfig(Backend.JSON, temporary.newFolder().toPath(), 1)); var lands = new LandService(new DatasetRepository(store));
+             var purchases = new PurchaseCoordinator(lands, store, () -> gone)) {
+            var outcome = purchases.purchase(claim, "money", 100, treasury).get();
+            assertEquals("REJECTED", outcome.status());
+            assertFalse(purchases.hasPending());
+            assertTrue(lands.snapshot().index().all().isEmpty());
+        }
+    }
 }

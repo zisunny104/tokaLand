@@ -72,4 +72,18 @@ public class SaleCoordinatorTest {
             var c=claim();lands.create(c).get();assertEquals("COMPLETED",sales.sell(c,c.ownerId(),"money",0,null).get().status());assertTrue(lands.snapshot().index().all().isEmpty());
         }
     }
+    @Test public void aRefusedSaleCanBeTriedAgainOnceTheObstacleIsGone()throws Exception{
+        try(var store=DocumentStore.open(new StoreConfig(Backend.JSON,temporary.newFolder().toPath(),1));var lands=new LandService(new DatasetRepository(store))){
+            var parent=claim();var child=new LandClaim(UUID.randomUUID(),"Child",ClaimKind.PLAYER,"land",null,parent.id(),true,true,
+                List.of(new LandSelection("world",1,1,1,2,2,2,false)),List.of(),AccessPolicy.privateDefault(),Map.of(),null,null,ClaimDetails.privateDefaults());
+            lands.replace(lands.snapshot().revision(),List.of(parent,child)).get();var ledger=new Ledger();
+            try(var sales=new SaleCoordinator(lands,store,()->ledger)){
+                assertEquals("REJECTED",sales.sell(parent,parent.ownerId(),"money",30,null).get().status());
+                assertFalse(sales.hasPending());
+                lands.deleteAll(List.of(child)).get();
+                assertEquals("COMPLETED",sales.sell(parent,parent.ownerId(),"money",30,null).get().status());
+                assertEquals(30,ledger.credited);assertTrue(lands.snapshot().index().all().isEmpty());
+            }
+        }
+    }
 }

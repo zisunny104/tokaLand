@@ -24,7 +24,9 @@ public final class Providers {
     private final Map<String, Registration<BiPredicate<Player, String>>> groups = new HashMap<>();
     private volatile Registration<BiPredicate<Player, String>> authority;
     private Registration<BiFunction<Player, String, String>> pricing;
-    private boolean pricingLost;
+    /** When the registered provider was found gone; 0 while there is one or there never was one. */
+    private volatile long pricingLostSince;
+    private volatile boolean fallbackLogged;
 
     Providers(Main plugin) { this.plugin = plugin; }
 
@@ -104,20 +106,30 @@ public final class Providers {
         if (pricing != null && pricing.identity() != provider && pricing.identity().isEnabled())
             throw new IllegalStateException("Purchase policy already registered");
         pricing = new Registration<>(name, provider, Objects.requireNonNull(callback));
-        pricingLost = false;
+        pricingLostSince = 0;
+        fallbackLogged = false;
     }
 
     /**
      * Asks the region/pricing provider (SELECT or ADJUST). Empty when none was ever registered, so the caller applies
-     * its defaults; a provider that disappeared after registering fails closed instead of silently changing prices.
+     * its defaults. A provider that disappeared after registering fails closed for {@code pricing.provider-lost-grace-seconds}
+     * (it may only be reloading, and its region rules matter), then Land goes back to its own defaults so purchases keep
+     * working; that is logged once, and a provider that registers again takes over at once.
      */
     public Optional<JsonObject> ask(Player player, JsonObject request) {
         var provider = pricing;
         if (provider == null) {
-            if (pricingLost) throw new IllegalStateException("PURCHASE_POLICY_UNAVAILABLE");
+            if (pricingLostSince != 0) {
+                long grace = plugin.getConfig().getLong("pricing.provider-lost-grace-seconds", 300) * 1000L;
+                if (System.currentTimeMillis() - pricingLostSince < grace) throw new IllegalStateException("PURCHASE_POLICY_UNAVAILABLE");
+                if (!fallbackLogged) {
+                    fallbackLogged = true;
+                    plugin.getLogger().warning("購地規則提供者已消失超過寬限時間，改用 Land 自己的預設價格與規則；它重新註冊後會立即接手。");
+                }
+            }
             return Optional.empty();
         }
-        if (!alive(provider)) { pricing = null; pricingLost = true; throw new IllegalStateException("PURCHASE_POLICY_UNAVAILABLE"); }
+        if (!alive(provider)) { pricing = null; pricingLostSince = System.currentTimeMillis(); fallbackLogged = false; throw new IllegalStateException("PURCHASE_POLICY_UNAVAILABLE"); }
         var reply = JsonParser.parseString(provider.callback().apply(player, request.toString())).getAsJsonObject();
         if (!"OK".equals(reply.get("status").getAsString())) throw new IllegalStateException("PURCHASE_POLICY_DENIED");
         return Optional.of(reply);

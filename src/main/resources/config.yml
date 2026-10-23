@@ -61,5 +61,7 @@ pricing:
   per-block: 6.3
   # 平面（忽略高度）領地每方塊單價，只計平面面積。
   per-block-flat: 73.1
+  # 購地規則提供者（如 tokaRegions）消失後，先拒絕購買這麼多秒（它可能只是重載），之後改用上面的預設價格與規則；它重新註冊就立即接手。
+  provider-lost-grace-seconds: 300
   # 刪除領地時退還基礎價格的比例，只退給建立者。
   refund-rate: 0.7

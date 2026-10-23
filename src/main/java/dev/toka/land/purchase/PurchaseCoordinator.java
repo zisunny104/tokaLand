@@ -13,13 +13,16 @@ import java.util.function.Supplier;
 /** Durable purchase intent precedes payment. Unknown outcomes always retain the original operation ID. */
 public final class PurchaseCoordinator implements AutoCloseable {
     public interface Ledger {
-        /** Takes the price from the buyer; {@code beneficiary} receives it, or null when nothing holds the money. */
+        /**
+         * Takes the price from the buyer; {@code beneficiary} receives it, or null when nothing holds the money. What the
+         * journal says is followed: a beneficiary is never ignored, and without one no treasury is used.
+         */
         CompletableFuture<String> debit(UUID player,UUID beneficiary,String currency,long amount,String operation);
         /** Gives back exactly what {@link #debit} took, from the beneficiary when there was one. */
         CompletableFuture<String> refund(UUID player,UUID beneficiary,String currency,long amount,String operation);
         /** Pays {@code player}; {@code source} pays it, or null when the money is created. */
         default CompletableFuture<String> credit(UUID player,UUID source,String currency,long amount,String operation){return CompletableFuture.failedFuture(new UnsupportedOperationException("Credit API unavailable"));}
-        /** Whether the account holds the amount: OK, INSUFFICIENT_FUNDS or another status. */
+        /** Whether the account holds the amount: OK, INSUFFICIENT_FUNDS, TREASURY_UNAVAILABLE (the account is gone) or another status. */
         default String covers(UUID account,String currency,long amount){return "OK";}
         /** Whether payments can really be moved into this account; if not, a purchase must not record it as the refund source. */
         default boolean accepts(UUID account){return true;}
@@ -106,7 +109,7 @@ public final class PurchaseCoordinator implements AutoCloseable {
             if(entry.state==State.PREPARED){
                 String payment=entry.amount==0?"OK":payments.debit(entry.claim.ownerId(),entry.beneficiary,entry.currency,entry.amount,entry.claim.id().toString()).get(30,TimeUnit.SECONDS);
                 if(!"OK".equals(payment)){
-                    if(!Set.of("INSUFFICIENT_FUNDS","NO_ACCOUNT","UNKNOWN_CURRENCY").contains(payment))return result("PENDING",entry,payment);
+                    if(!Set.of("INSUFFICIENT_FUNDS","NO_ACCOUNT","UNKNOWN_CURRENCY","TREASURY_UNAVAILABLE").contains(payment))return result("PENDING",entry,payment);
                     save(entry.with(State.REJECTED));return result("REJECTED",entry,payment);
                 }
                 entry=entry.with(State.PAID);save(entry);

@@ -15,6 +15,22 @@ public final class LandService implements AutoCloseable {
     public LandService(DatasetRepository repository)throws IOException{this.repository=repository;snapshot=repository.load();}
     public DatasetRepository.Snapshot snapshot(){return snapshot;}
     public boolean healthy(){return healthy;}
+    /**
+     * After a failed write the copy in memory is in doubt, so the stored data is read back on the writer thread; if it is
+     * readable and consistent it becomes the current data and Land carries on. Completes with whether Land is healthy.
+     */
+    public CompletableFuture<Boolean> recover(){
+        if(healthy)return CompletableFuture.completedFuture(true);
+        return CompletableFuture.supplyAsync(()->{
+            try{ensureHealthy();return true;}
+            catch(RuntimeException stillBroken){return false;}
+        },writer);
+    }
+    private void ensureHealthy(){
+        if(healthy)return;
+        try{snapshot=repository.load();healthy=true;}
+        catch(Exception failure){throw new IllegalStateException("Land storage requires recovery",failure);}
+    }
     public static final class ClaimConflict extends RuntimeException {
         public ClaimConflict(String reason){super(reason);}
     }
@@ -51,7 +67,7 @@ public final class LandService implements AutoCloseable {
     /** Native creation, serialized with other writes. Existing claims are never overwritten. */
     public CompletableFuture<String> create(LandClaim claim){
         return CompletableFuture.supplyAsync(()->{
-            if(!healthy)throw new IllegalStateException("Land storage requires recovery");
+            ensureHealthy();
             checkCreation(claim);
             if(snapshot.index().get(claim.id()).filter(claim::equals).isPresent())return snapshot.revision();
             var all=new ArrayList<>(snapshot.index().all());all.add(claim);
@@ -63,7 +79,7 @@ public final class LandService implements AutoCloseable {
         List<LandClaim> detached=List.copyOf(claims);
         new LandIndex(detached); // Reject invalid caller input before entering the persistence path.
         return CompletableFuture.supplyAsync(()->{
-            if(!healthy)throw new IllegalStateException("Land storage requires recovery");
+            ensureHealthy();
             try{snapshot=repository.replace(expectedRevision,detached);return snapshot.revision();}
             catch(ConcurrentModificationException error){throw error;}
             catch(Exception error){healthy=false;throw new CompletionException(error);}
@@ -73,7 +89,7 @@ public final class LandService implements AutoCloseable {
     public CompletableFuture<String> edit(LandClaim before,LandClaim after){
         if(!before.id().equals(after.id()))throw new IllegalArgumentException("Claim identity cannot change");
         return CompletableFuture.supplyAsync(()->{
-            if(!healthy)throw new IllegalStateException("Land storage requires recovery");
+            ensureHealthy();
             if(!snapshot.index().get(before.id()).filter(before::equals).isPresent())throw new ConcurrentModificationException("CLAIM_CHANGED");
             if(!before.name().equals(after.name())&&snapshot.index().all().stream().anyMatch(c->!c.id().equals(after.id())&&c.name().equals(after.name())))throw new ClaimConflict("NAME_CONFLICT");
             if(after.kind()==ClaimKind.PLAYER&&!before.selections().equals(after.selections())
@@ -87,7 +103,7 @@ public final class LandService implements AutoCloseable {
     }
     public CompletableFuture<String> delete(LandClaim expected){
         return CompletableFuture.supplyAsync(()->{
-            if(!healthy)throw new IllegalStateException("Land storage requires recovery");
+            ensureHealthy();
             if(!snapshot.index().get(expected.id()).filter(expected::equals).isPresent())throw new ClaimConflict("CLAIM_CHANGED");
             if(snapshot.index().all().stream().anyMatch(c->expected.id().equals(c.parentClaimId())))throw new ClaimConflict("CHILD_CLAIMS_EXIST");
             var all=new ArrayList<>(snapshot.index().all());all.removeIf(c->c.id().equals(expected.id()));
@@ -99,7 +115,7 @@ public final class LandService implements AutoCloseable {
     public CompletableFuture<Integer> renameWorld(String from,String to){
         if(from==null||to==null||from.isBlank()||to.isBlank()||from.equals(to))throw new IllegalArgumentException("INVALID_WORLD_NAME");
         return CompletableFuture.supplyAsync(()->{
-            if(!healthy)throw new IllegalStateException("Land storage requires recovery");
+            ensureHealthy();
             var current=snapshot.index().all();
             if(current.stream().anyMatch(c->c.world().equals(to)))throw new ClaimConflict("WORLD_NAME_IN_USE");
             var all=new ArrayList<LandClaim>();int renamed=0;
@@ -116,7 +132,7 @@ public final class LandService implements AutoCloseable {
     public CompletableFuture<String> deleteAll(List<LandClaim> expected){
         List<LandClaim> targets=List.copyOf(expected);
         return CompletableFuture.supplyAsync(()->{
-            if(!healthy)throw new IllegalStateException("Land storage requires recovery");
+            ensureHealthy();
             Set<UUID> ids=new HashSet<>();
             for(LandClaim claim:targets){
                 if(!snapshot.index().get(claim.id()).filter(claim::equals).isPresent())throw new ClaimConflict("CLAIM_CHANGED");

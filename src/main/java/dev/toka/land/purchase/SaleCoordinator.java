@@ -42,6 +42,8 @@ public final class SaleCoordinator implements AutoCloseable {
         return CompletableFuture.supplyAsync(()->{
             try{
                 Entry known=entries.get(claim.id());
+                // A refused sale changed nothing, so it is not a sale in progress: the next attempt starts afresh.
+                if(known!=null&&known.state==State.REJECTED)known=null;
                 if(known!=null){
                     if(!known.claim.equals(claim)||!known.recipient.equals(recipient)||!known.currency.equals(currency)||known.amount!=amount||!Objects.equals(known.source,source))return result("CONFLICT",known,"SALE_MISMATCH");
                     return advance(known);

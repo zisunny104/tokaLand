@@ -95,4 +95,39 @@ public class LandServiceTest {
             try { lands.renameWorld("other", "w").get(); fail(); } catch (ExecutionException error) { assertEquals("WORLD_NAME_IN_USE", reason(error)); }
         }
     }
+    /** Fails the next save of the dataset, as a full disk or a locked file would. */
+    private static final class FlakyStore implements DocumentStore {
+        final DocumentStore delegate;boolean failNext;
+        FlakyStore(DocumentStore delegate) { this.delegate = delegate; }
+        public java.util.Optional<com.google.gson.JsonObject> load(String key) throws java.io.IOException { return delegate.load(key); }
+        public void save(String key, com.google.gson.JsonObject data) throws java.io.IOException {
+            if (failNext) { failNext = false; throw new java.io.IOException("disk full"); }
+            delegate.save(key, data);
+        }
+        public void saveAll(java.util.Map<String, com.google.gson.JsonObject> values) throws java.io.IOException {
+            if (failNext) { failNext = false; throw new java.io.IOException("disk full"); }
+            delegate.saveAll(values);
+        }
+        public void delete(String key) throws java.io.IOException { delegate.delete(key); }
+        public java.util.Set<String> keys() throws java.io.IOException { return delegate.keys(); }
+        public java.util.SortedMap<String, com.google.gson.JsonObject> snapshot() throws java.io.IOException { return delegate.snapshot(); }
+        public void close() {}
+    }
+
+    @Test public void aFailedWriteStopsLandOnlyUntilTheStoredDataIsReadBack() throws Exception {
+        try (var store = DocumentStore.open(new StoreConfig(Backend.JSON, temporary.newFolder().toPath(), 1))) {
+            var flaky = new FlakyStore(store);
+            var lands = new LandService(new DatasetRepository(flaky));
+            var first = claim("first", ClaimKind.PLAYER, null, 0, 4);
+            lands.create(first).get();
+            flaky.failNext = true;
+            try { lands.create(claim("second", ClaimKind.PLAYER, null, 10, 14)).get(); fail(); } catch (ExecutionException expected) { /* the write failed */ }
+            assertFalse(lands.healthy());
+            assertTrue(lands.recover().get());
+            assertTrue(lands.healthy());
+            lands.create(claim("third", ClaimKind.PLAYER, null, 20, 24)).get();
+            assertTrue(lands.snapshot().index().get(first.id()).isPresent());
+            assertEquals(2, lands.snapshot().index().all().size());
+        }
+    }
 }

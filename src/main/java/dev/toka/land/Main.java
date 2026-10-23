@@ -79,7 +79,10 @@ public final class Main extends PluginBase {
             ready = true;
             trading.connectEconomy();
             registerCommand();
-            getServer().getScheduler().scheduleRepeatingTask(this, trading::maintain, 200);
+            getServer().getScheduler().scheduleRepeatingTask(this, () -> {
+                if (!lands.healthy()) lands.recover().thenAccept(ok -> { if (ok) getLogger().info("領地資料已從儲存重新讀取，恢復運作。"); });
+                trading.maintain();
+            }, 200);
             getLogger().info("Land 資料載入完成，共 " + lands.snapshot().index().all().size() + " 筆；儲存格式：" + backend);
         } catch (Exception error) {
             ready = false;
