@@ -30,10 +30,11 @@ public final class Main extends PluginBase {
     private DocumentStore store;
     private LandService lands;
     private LegacyLink legacyLink;
-    LandService lands() { return lands; }
+    public LandService lands() { return lands; }
     private Providers providers;
     private ProtectionQueries queries;
     private Trading trading;
+    private dev.toka.land.lease.Leases leases;
     private Management management;
     private Facilities facilities;
     private DatasetAPI dataset;
@@ -71,6 +72,7 @@ public final class Main extends PluginBase {
             texts = new Texts(this, playerNames);
             trading = new Trading(this, lands, store);
             management = new Management(this, lands, trading, playerNames);
+            leases = new dev.toka.land.lease.Leases(this, new dev.toka.land.lease.LeaseBook(store));
             facilities = new Facilities(this, lands, config);
             dataset = new DatasetAPI(lands, trading);
             topbar = new TopbarService(this);
@@ -83,6 +85,7 @@ public final class Main extends PluginBase {
             getServer().getScheduler().scheduleRepeatingTask(this, () -> {
                 if (!lands.healthy()) lands.recover().thenAccept(ok -> { if (ok) getLogger().info("領地資料已從儲存重新讀取，恢復運作。"); });
                 trading.maintain();
+                if (leases != null && ownership) leases.maintain();
             }, 200);
             getLogger().info("§b載入領地共 §a" + lands.snapshot().index().all().size() + " §b個");
         } catch (Exception error) {
@@ -194,6 +197,7 @@ public final class Main extends PluginBase {
     public SelectionToolListener selectionTool() { return selectionTool; }
     public Management management() { return management; }
     public Trading trading() { return trading; }
+    public dev.toka.land.lease.Leases leases() { return leases; }
     public Facilities facilities() { return facilities; }
     public Texts texts() { return texts; }
     public ProtectionQueries queries() { return queries; }

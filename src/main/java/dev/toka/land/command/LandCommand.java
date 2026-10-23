@@ -57,6 +57,8 @@ public final class LandCommand extends Command {
             CommandParameter.newEnum("sub",new CommandEnum("TokaLandFacilitySubmode",new String[]{"mode"})),CommandParameter.newType("name",CommandParamType.STRING),
             CommandParameter.newEnum("value",new CommandEnum("TokaLandFacilityModeValue",new String[]{"open","protect","private"}))});
         addCommandParameters("menu",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandMenuAction",new String[]{"menu","gui"}))});
+        addCommandParameters("lease",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandLeaseAction",new String[]{"lease"})),CommandParameter.newType("terms",true,CommandParamType.RAWTEXT)});
+        addCommandParameters("sub",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandSubAction",new String[]{"sub"})),CommandParameter.newType("parent",CommandParamType.STRING),CommandParameter.newType("name",CommandParamType.STRING)});
         addCommandParameters("localInfo",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandLocalInfoAction",new String[]{"info"}))});
         addCommandParameters("ownerList",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandOwnerListAction",new String[]{"list"})),CommandParameter.newType("player",true,CommandParamType.TARGET)});
         addCommandParameters("grant",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandGrantAction",new String[]{"grant"})),
@@ -74,6 +76,7 @@ public final class LandCommand extends Command {
         if(!plugin.isReady()){send(sender,"ui.unavailable","Land");return true;}
         if(Set.of("rename","give","type","group","grp","del").contains(action)
                 ||action.equals("tpl")&&sender instanceof Player p&&(args.length>1||!plugin.management().claimsAround(p).isEmpty()))return manage(sender,action,args);
+        if(action.equals("sub")||action.equals("lease"))return plugin.leases().command(sender,args);
         if(action.equals("fac")||action.equals("facility"))return facilityCommand(sender,args);
         if(Set.of("set","tpl","select","slt").contains(action))return purchaseCommand(sender,action,args);
         if(sender instanceof Player self&&sender.hasPermission("tokaland.use")){

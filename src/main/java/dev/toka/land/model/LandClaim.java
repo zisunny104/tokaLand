@@ -48,6 +48,12 @@ public record LandClaim(UUID id, String name, ClaimKind kind, String type,
         }
     }
 
+    /** The same claim with another owner and permission set, as when a sub-claim is let to a tenant or given back. */
+    public LandClaim withTenancy(UUID owner, String ownerName, boolean inheritOwner, boolean inheritPermissions, List<AccessGrant> grants) {
+        return new LandClaim(id, name, kind, type, owner, parentClaimId, inheritOwner, inheritPermissions, selections, grants, accessPolicy,
+                localizedNames, null, ownerName, details);
+    }
+
     public String world() { return selections.getFirst().world(); }
 
     public String displayName(String language) {
