@@ -27,6 +27,17 @@ final class TopbarService implements Listener {
 
     TopbarService(Main plugin) {
         this.plugin = plugin;
+        connect();
+    }
+
+    /** tokaDisplay may start after this plugin or be reloaded, which drops what was registered with it; connect again whenever it comes up. */
+    @EventHandler public void onDisplayEnabled(cn.nukkit.event.plugin.PluginEnableEvent event) {
+        if (event.getPlugin().getName().equals("tokaDisplay")) { shown.clear(); plugin.getServer().getScheduler().scheduleTask(plugin, this::connect); }
+    }
+
+    private void connect() {
+        pin = null;
+        unpin = null;
         Plugin display = plugin.getServer().getPluginManager().getPlugin("tokaDisplay");
         if (display == null || !display.isEnabled()) return;
         try {
