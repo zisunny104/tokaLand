@@ -43,7 +43,6 @@ public final class Providers {
 
     /**
      * The provider keeps its own legacy rules; ordinary claim membership is no replacement. One provider at a time.
-     * TODO(migration): the legacy qx permission rules for PROTECT claims still need an owner once zero is gone.
      */
     public void registerAuthority(String name, BiPredicate<Player, String> callback) {
         Plugin provider = enabled(name, "Authority provider");
@@ -99,7 +98,6 @@ public final class Providers {
 
     /**
      * Region rules and price adjustments are optional: without a provider Land uses its own defaults.
-     * TODO(migration): zero is the only provider today; replace it when Region and the tax/discount rules have an owner.
      */
     public void registerPricing(String name, BiFunction<Player, String, String> callback) {
         Plugin provider = enabled(name, "Purchase policy provider");

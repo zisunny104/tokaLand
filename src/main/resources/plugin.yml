@@ -1,6 +1,6 @@
 name: tokaLand
 main: dev.toka.land.Main
-version: "0.1.9"
+version: "0.1.11"
 api: ["1.0.4"]
 load: POSTWORLD
 softdepend: [tokaDisplay, tokaProfiles, tokaWorlds, tokaEconomy]

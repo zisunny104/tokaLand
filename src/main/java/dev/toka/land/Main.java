@@ -62,8 +62,6 @@ public final class Main extends PluginBase {
             lands = new LandService(new DatasetRepository(store));
             // The cutover tool flips ownership.active only after the previous manager is disabled; Land never probes other plugins.
             ownership = config.getBoolean("ownership.active", false);
-            if (ownership) getLogger().info("Land 領地保護運作中（ownership.active: true）。");
-            else getLogger().info("Land 待命中：ownership.active 為 false，不攔截任何事件。");
 
             playerNames = new PlayerNames(getServer());
             providers = new Providers(this);
@@ -83,7 +81,7 @@ public final class Main extends PluginBase {
                 if (!lands.healthy()) lands.recover().thenAccept(ok -> { if (ok) getLogger().info("領地資料已從儲存重新讀取，恢復運作。"); });
                 trading.maintain();
             }, 200);
-            getLogger().info("Land 資料載入完成，共 " + lands.snapshot().index().all().size() + " 筆；儲存格式：" + backend);
+            getLogger().info("§b載入領地共 §a" + lands.snapshot().index().all().size() + " §b個");
         } catch (Exception error) {
             ready = false;
             getLogger().error("Land 未能載入；為避免以空資料覆蓋原資料，插件將停用。", error);
@@ -120,9 +118,7 @@ public final class Main extends PluginBase {
         if (existing != null && existing != command) {
             getLogger().warning("/land 已由其他插件註冊；請先停用該入口再重啟。此次不註冊替代指令。");
             command = null;
-        } else if (commands.register("tokaLand", command) && commands.getCommand("land") == command) {
-            getLogger().info("指令 /land 已註冊，Tab 候選已啟用。");
-        } else {
+        } else if (!(commands.register("tokaLand", command) && commands.getCommand("land") == command)) {
             getLogger().error("無法註冊根指令 /land；請檢查指令衝突。未啟用其他替代入口。");
             command = null;
         }
@@ -167,7 +163,6 @@ public final class Main extends PluginBase {
         ConfigEdit.setBoolean(main.getDataFolder().toPath().resolve("config.yml"), "ownership", "active", on);
         main.getConfig().set("ownership.active", on);
         main.ownership = on;
-        main.getLogger().info(on ? "Land 已接手領地保護（ownership.active: true）。" : "Land 已交還領地保護（ownership.active: false）。");
     }
 
     public static boolean ownsLand() { return instance != null && instance.isReady() && instance.ownership; }
