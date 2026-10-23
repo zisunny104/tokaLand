@@ -106,26 +106,49 @@ public final class Leases {
 
     // ---- sub-claims ----
 
-    /** Cuts a sub-claim out of a claim the player owns, from the selection in hand */
-    public void createSub(Player player, String parentName, String name) {
-        var parent = named(parentName).orElse(null);
-        if (parent == null) { player.sendMessage(text(player, "lease.noClaim", parentName)); return; }
-        if (!ownerOf(parent).filter(player.getUniqueId()::equals).isPresent() && !player.hasPermission("tokaland.admin")) { player.sendMessage(text(player, "lease.notOwner")); return; }
+    /**
+     * Cuts a sub-claim out of the selection in hand. The selection has to lie completely inside one claim, which becomes the parent; inside
+     * a chain of claims the innermost is the parent. A selection that sticks out of a claim, or lies in several claims that are not
+     * parent and child, cannot be made.
+     */
+    public void createSub(Player player, String name) {
         var tool = plugin.selectionTool();
         var draft = tool == null ? null : tool.get(player.getUniqueId());
         if (draft == null) { player.sendMessage(text(player, "lease.needSelection")); return; }
         var part = draft.geometry();
-        if (parent.selections().stream().noneMatch(p -> p.contains(part))) { player.sendMessage(text(player, "lease.outside", parent.name())); return; }
+        List<LandClaim> containing = new ArrayList<>();
+        for (LandClaim each : plugin.allClaims()) {
+            boolean inside = each.selections().stream().anyMatch(p -> p.contains(part));
+            boolean touches = each.selections().stream().anyMatch(p -> dev.toka.land.LandService.overlaps(p, part));
+            if (inside) containing.add(each);
+            else if (touches) { player.sendMessage(text(player, "lease.exceeds", each.name())); return; }
+        }
+        if (containing.isEmpty()) { player.sendMessage(text(player, "lease.noParent")); return; }
+        LandClaim parent = null;
+        for (LandClaim candidate : containing) {
+            boolean innermost = containing.stream().allMatch(other -> other.id().equals(candidate.id()) || isAncestor(other.id(), candidate));
+            if (innermost) parent = candidate;
+        }
+        if (parent == null) { player.sendMessage(text(player, "lease.manyParents")); return; }
+        if (!ownerOf(parent).filter(player.getUniqueId()::equals).isPresent() && !player.hasPermission("tokaland.admin")) { player.sendMessage(text(player, "lease.notOwner")); return; }
         if (ReservedNames.is(name)) { player.sendMessage(text(player, "lease.badName")); return; }
+        final LandClaim chosen = parent;
         ClaimDetails.TeleportPoint point = draft.teleport();
         if (point != null && !part.contains(point.world(), (int) Math.floor(point.x()), (int) Math.floor(point.y()), (int) Math.floor(point.z()))) point = null;
         var details = new ClaimDetails(player.getUniqueId(), player.getName(), point, false, 0L, null);
-        var sub = new LandClaim(UUID.randomUUID(), name, ClaimKind.PLAYER, "sub", null, parent.id(), true, true, List.of(part), List.of(),
+        var sub = new LandClaim(UUID.randomUUID(), name, ClaimKind.PLAYER, "sub", null, chosen.id(), true, true, List.of(part), List.of(),
                 AccessPolicy.privateDefault(), Map.of(), null, null, details);
         plugin.lands().create(sub).whenComplete((revision, error) -> plugin.getServer().getScheduler().scheduleTask(plugin, () -> {
             if (error != null) player.sendMessage(text(player, "lease.failed", rootMessage(error)));
-            else { tool.forget(player.getUniqueId(), draft); player.sendMessage(text(player, "lease.subCreated", name, parent.name())); }
+            else { tool.forget(player.getUniqueId(), draft); player.sendMessage(text(player, "lease.subCreated", name, chosen.name())); }
         }));
+    }
+
+    private boolean isAncestor(UUID ancestor, LandClaim of) {
+        java.util.Set<UUID> seen = new java.util.HashSet<>();
+        for (UUID parent = of.parentClaimId(); parent != null && seen.add(parent); parent = claim(parent).map(LandClaim::parentClaimId).orElse(null))
+            if (parent.equals(ancestor)) return true;
+        return false;
     }
 
     // ---- offering, renting, leaving ----
@@ -396,7 +419,7 @@ public final class Leases {
         if (!(sender instanceof Player player) || !sender.hasPermission("tokaland.use")) { sender.sendMessage(text(sender, "command.denied")); return true; }
         try {
             if (args[0].equalsIgnoreCase("sub")) {
-                if (args.length != 3) player.sendMessage(text(player, "lease.usage")); else createSub(player, args[1], args[2]);
+                if (args.length != 2) player.sendMessage(text(player, "lease.usage")); else createSub(player, args[1]);
                 return true;
             }
             if (args.length < 2) { player.sendMessage(text(player, "lease.usage")); return true; }

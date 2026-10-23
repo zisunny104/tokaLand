@@ -116,7 +116,6 @@ lease:
   notSub: "§c這不是子領地。"
   notOwner: "§c只有出租人（領地擁有者）可以這樣做。"
   needSelection: "§e請先用木鋤選好子領地的範圍。"
-  outside: "§c子領地必須完整位於 ${0} 之內。"
   badName: "§c這個名稱不能使用。"
   subCreated: "§a已在 ${1} 內建立子領地 ${0}。"
   busy: "§e這塊子領地現在有人承租或正在處理。"

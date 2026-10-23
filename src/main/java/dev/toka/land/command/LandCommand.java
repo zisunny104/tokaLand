@@ -58,7 +58,7 @@ public final class LandCommand extends Command {
             CommandParameter.newEnum("value",new CommandEnum("TokaLandFacilityModeValue",new String[]{"open","protect","private"}))});
         addCommandParameters("menu",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandMenuAction",new String[]{"menu","gui"}))});
         addCommandParameters("lease",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandLeaseAction",new String[]{"lease"})),CommandParameter.newType("terms",true,CommandParamType.RAWTEXT)});
-        addCommandParameters("sub",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandSubAction",new String[]{"sub"})),CommandParameter.newType("parent",CommandParamType.STRING),CommandParameter.newType("name",CommandParamType.STRING)});
+        addCommandParameters("sub",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandSubAction",new String[]{"sub"})),CommandParameter.newType("name",CommandParamType.STRING)});
         addCommandParameters("localInfo",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandLocalInfoAction",new String[]{"info"}))});
         addCommandParameters("ownerList",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandOwnerListAction",new String[]{"list"})),CommandParameter.newType("player",true,CommandParamType.TARGET)});
         addCommandParameters("grant",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandGrantAction",new String[]{"grant"})),
