@@ -47,7 +47,7 @@ final class TopbarService implements Listener {
 
     private void update(Player player, Position at) {
         if (show == null || at.getLevel() == null || !Main.ownsLand() || !plugin.getConfig().getBoolean("display.player-land-topbar", true)) return;
-        String language = player.getLocale().toLanguageTag();
+        String language = player.getLocale() == null ? plugin.getConfig().getString("language", "zh-TW") : player.getLocale().toLanguageTag();
         List<String> lines = plugin.findAllAt(at.getLevel().getFolderName(), at.getFloorX(), at.getFloorY(), at.getFloorZ())
                 .stream().filter(claim -> claim.kind() == ClaimKind.PLAYER)
                 .map(claim -> plugin.texts().message(language, "ui.land", claim.displayName(language), plugin.texts().ownerText(claim, language)))

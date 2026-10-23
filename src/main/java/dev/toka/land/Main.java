@@ -29,6 +29,8 @@ public final class Main extends PluginBase {
 
     private DocumentStore store;
     private LandService lands;
+    private LegacyLink legacyLink;
+    LandService lands() { return lands; }
     private Providers providers;
     private ProtectionQueries queries;
     private Trading trading;
@@ -76,6 +78,7 @@ public final class Main extends PluginBase {
             registerListeners();
             ready = true;
             trading.connectEconomy();
+            legacyLink.connect();
             registerCommand();
             getServer().getScheduler().scheduleRepeatingTask(this, () -> {
                 if (!lands.healthy()) lands.recover().thenAccept(ok -> { if (ok) getLogger().info("領地資料已從儲存重新讀取，恢復運作。"); });
@@ -91,6 +94,8 @@ public final class Main extends PluginBase {
 
     private void registerListeners() {
         var plugins = getServer().getPluginManager();
+        legacyLink = new LegacyLink(this);
+        plugins.registerEvents(legacyLink, this);
         plugins.registerEvents(new ClaimTracker(this), this);
         plugins.registerEvents(topbar, this);
         plugins.registerEvents(window, this);

@@ -22,7 +22,7 @@ public final class Texts {
     }
 
     public String language(CommandSender sender) {
-        return sender instanceof Player player ? player.getLocale().toLanguageTag() : plugin.getConfig().getString("language", "zh-TW");
+        return sender instanceof Player player && player.getLocale() != null ? player.getLocale().toLanguageTag() : plugin.getConfig().getString("language", "zh-TW");
     }
 
     public String message(String language, String key, Object... args) {

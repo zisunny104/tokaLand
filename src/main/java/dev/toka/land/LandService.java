@@ -101,6 +101,18 @@ public final class LandService implements AutoCloseable {
             catch(Exception failure){healthy=false;throw new CompletionException(failure);}
         },writer);
     }
+    /** Replaces old names by accounts where the profile service has announced them; the number of claims changed. */
+    public CompletableFuture<Integer> replaceLegacyNames(Map<String,UUID> resolved){
+        return CompletableFuture.supplyAsync(()->{
+            ensureHealthy();
+            var before=List.copyOf(snapshot.index().all());
+            var after=LegacyNames.apply(before,resolved);
+            if(after==before)return 0;
+            int changed=0;for(int i=0;i<before.size();i++)if(before.get(i)!=after.get(i))changed++;
+            try{snapshot=repository.replace(snapshot.revision(),after);return changed;}
+            catch(Exception failure){healthy=false;throw new CompletionException(failure);}
+        },writer);
+    }
     public CompletableFuture<String> delete(LandClaim expected){
         return CompletableFuture.supplyAsync(()->{
             ensureHealthy();
