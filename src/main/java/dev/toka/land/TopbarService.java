@@ -12,6 +12,7 @@ import dev.toka.land.event.PlayerLeaveClaimEvent;
 import dev.toka.land.model.ClaimKind;
 import java.lang.reflect.Method;
 import java.util.*;
+import java.util.function.Function;
 
 /**
  * Shows the claim the player stands in at the top, through tokaDisplay: it stays for as long as the player is inside and is taken
@@ -30,6 +31,7 @@ final class TopbarService implements Listener {
         if (display == null || !display.isEnabled()) return;
         try {
             Class<?> api = Class.forName("dev.toka.display.Main", true, display.getClass().getClassLoader());
+            api.getMethod("registerSection", String.class, String.class, Function.class).invoke(null, "tokaLand", "area", (Function<Player, String>) this::facilityLight);
             pin = api.getMethod("pin", Player.class, String.class, String.class, int.class, int.class, float.class, String.class);
             unpin = api.getMethod("unpin", Player.class, String.class);
         } catch (ReflectiveOperationException | LinkageError error) {
@@ -45,6 +47,11 @@ final class TopbarService implements Listener {
     @EventHandler(priority = EventPriority.MONITOR) public void onQuit(PlayerQuitEvent event) { remove(event.getPlayer()); }
 
     void removeAll() {
+        Plugin display = plugin.getServer().getPluginManager().getPlugin("tokaDisplay");
+        if (display != null) {
+            try { Class.forName("dev.toka.display.Main", true, display.getClass().getClassLoader()).getMethod("unregisterSections", String.class).invoke(null, "tokaLand"); }
+            catch (ReflectiveOperationException | LinkageError ignored) { }
+        }
         for (Player player : plugin.getServer().getOnlinePlayers().values()) remove(player);
     }
 
@@ -63,6 +70,14 @@ final class TopbarService implements Listener {
             plugin.getLogger().warning("tokaDisplay API 失效，領地頂部提示停用：" + error.getClass().getSimpleName());
             pin = null;
         }
+    }
+
+    /** The facility light of the sidebar: lit with the facility's type while the player stands in a facility, grey otherwise. */
+    private String facilityLight(Player player) {
+        if (!Main.ownsLand() || player.getLevel() == null) return null;
+        var type = plugin.findAllAt(player.getLevel().getFolderName(), player.getFloorX(), player.getFloorY(), player.getFloorZ()).stream()
+                .filter(claim -> claim.kind() == ClaimKind.FACILITY).map(claim -> claim.type()).filter(name -> name != null && !name.isEmpty()).findFirst();
+        return type.map(name -> "§6⧯" + name + "§r").orElse("§7⧯§r");
     }
 
     private void remove(Player player) {
