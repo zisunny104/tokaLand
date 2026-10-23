@@ -53,6 +53,13 @@ facility:
     rail:
       below: 0
       above: 0
+    # 地鐵與出生點保護：不擴張，只保護選取的範圍。
+    metro:
+      below: 0
+      above: 0
+    spawn:
+      below: 0
+      above: 0
 
 pricing:
   # 購地基礎價格；優待與稅務不在此處，由區域／稅務 provider 提供倍率。
