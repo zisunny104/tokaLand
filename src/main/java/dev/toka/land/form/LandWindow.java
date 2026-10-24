@@ -144,9 +144,7 @@ public final class LandWindow implements Listener {
         Lease held = plugin.leases().leaseOf(id);
         boolean tenant = held != null && player.getUniqueId().toString().equals(held.tenant);
         Runnable back = () -> list(player, page, query);
-        var menu = menu(player, claim.displayName(language), text(player, "tools.info", claim.id(), claim.displayName(language),
-                plugin.texts().ownerText(claim, language), claim.type(),
-                claim.accessPolicy().mode() + (claim.accessPolicy().locked() ? "+LOCK" : ""), claim.selections().size()));
+        var menu = menu(player, claim.displayName(language), plugin.texts().claimInfo(claim, language));
         menu.button(text(player, "window.back"), null, back);
         // The way there is tokaPortal's, and only a claim with a teleport point can be gone to.
         if (claim.details().teleport() != null && portal() != null) menu.button(text(player, "window.teleport"), "textures/items/ender_pearl", () -> goTo(player, claim));

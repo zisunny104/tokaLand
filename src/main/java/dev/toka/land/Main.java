@@ -266,6 +266,7 @@ public final class Main extends PluginBase {
     public static void unregisterAccessSubjectProvider(String providerId) { Main main = instance; if (main != null) { main.requirePrimaryThread(); main.providers.unregisterGroups(providerId); } }
     /** Region rules and price adjustments (SELECT, ADJUST). */
     public static void registerPurchasePolicy(String pluginName, BiFunction<Player, String, String> callback) { available().providers.registerPricing(pluginName, callback); }
+    public static void unregisterPurchasePolicy(String pluginName) { if (instance != null && instance.providers != null) instance.providers.unregisterPricing(pluginName); }
 
     /** Trusted plugin administration API; a maintenance lock always defeats player privileges. */
     public static void setMaintenanceLocked(boolean locked) {

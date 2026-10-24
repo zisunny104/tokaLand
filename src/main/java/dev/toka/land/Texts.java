@@ -48,6 +48,29 @@ public final class Texts {
         player.sendMessage(text(player, first ? "selection.first" : "selection.second", point.world(), point.x(), point.y(), point.z()));
     }
 
+    /** Everything that identifies a claim, with what each id belongs to; one line per fact. */
+    public String claimInfo(LandClaim claim, String language) {
+        String none = message(language, "tools.i.none");
+        var lines = new java.util.ArrayList<String>();
+        lines.add(message(language, "tools.i.id", claim.id()));
+        lines.add(message(language, "tools.i.name", claim.displayName(language)));
+        if (!claim.localizedNames().isEmpty())
+            lines.add(message(language, "tools.i.names", String.join(", ", new java.util.TreeMap<>(claim.localizedNames()).entrySet().stream().map(e -> e.getKey() + " = " + e.getValue()).toList())));
+        lines.add(message(language, "tools.i.owner", ownerText(claim, language), ClaimAccess.effectiveOwner(plugin.index(), claim.id()).map(Object::toString).orElse(none)));
+        var details = claim.details();
+        if (details.creatorId() != null)
+            lines.add(message(language, "tools.i.creator", names.find(details.creatorId()).orElse(details.creatorName() == null ? none : details.creatorName()), details.creatorId()));
+        if (claim.parentClaimId() != null)
+            lines.add(message(language, "tools.i.parent", plugin.getClaim(claim.parentClaimId()).map(parent -> parent.displayName(language)).orElse(none), claim.parentClaimId()));
+        var lease = plugin.leases() == null ? null : plugin.leases().leaseOf(claim.id());
+        if (lease != null && lease.tenant != null) lines.add(message(language, "tools.i.tenant", lease.tenantName == null ? none : lease.tenantName, lease.tenant));
+        lines.add(message(language, "tools.i.type", claim.type(), claim.accessPolicy().mode() + (claim.accessPolicy().locked() ? "+LOCK" : "")));
+        lines.add(message(language, "tools.i.place", claim.world(), claim.selections().size()));
+        var point = details.teleport();
+        if (point != null) lines.add(message(language, "tools.i.teleport", point.world(), Math.round(point.x()), Math.round(point.y()), Math.round(point.z())));
+        return String.join("\n", lines);
+    }
+
     /** Current name if known, else the stored snapshot or the UUID; unresolved legacy owners are labelled as pending. */
     public String ownerText(LandClaim claim, String language) {
         var owner = ClaimAccess.effectiveOwner(plugin.index(), claim.id());

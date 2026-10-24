@@ -21,8 +21,7 @@ final class ClaimTools {
         if (here.isEmpty()) { send(player, "tools.noneHere"); return true; }
         String language = plugin.texts().language(player);
         for (LandClaim claim : here)
-            send(player, "tools.info", claim.id(), claim.displayName(language), plugin.texts().ownerText(claim, language), claim.type(),
-                    claim.accessPolicy().mode() + (claim.accessPolicy().locked() ? "+LOCK" : ""), claim.selections().size());
+            player.sendMessage(plugin.texts().claimInfo(claim, language));
         return true;
     }
 

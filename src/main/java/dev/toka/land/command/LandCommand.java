@@ -22,42 +22,42 @@ public final class LandCommand extends Command {
         this.plugin=plugin;
         this.tools=new ClaimTools(plugin);
         this.help=new HelpPages("land",List.of(
-            new HelpPages.Section("read","tokaland.use",List.of("menu","info","list")),
-            new HelpPages.Section("manage","tokaland.use",List.of("select","tpl","set","rename","give","type","group","del","note")),
-            new HelpPages.Section("sub","tokaland.use",List.of("sub","leaseMenu","leaseOffer","leaseSet","leaseCancel","leaseRent","leaseRelease","leaseInfo","leaseList")),
-            new HelpPages.Section("admin","tokaland.admin",List.of("grant","refund","reset","clear","reload","fac","facHelp")),
-            new HelpPages.Section("facility","tokaland.admin",List.of("facCreate","facList","facDel","facType","facMode","facLock")),
-            new HelpPages.Section("inspect","tokaland.inspect",List.of("status","adminList","adminInfo"))),(sender,key,args)->plugin.texts().text(sender,key,args));
+            new HelpPages.Section("basics","tokaland.use",false,List.of("menu","info","list","select","set","tpl","rename","del")),
+            new HelpPages.Section("manage","tokaland.use",true,List.of("give","type","group","note")),
+            new HelpPages.Section("sub","tokaland.use",true,List.of("sub","leaseMenu","leaseOffer","leaseSet","leaseCancel","leaseRent","leaseRelease","leaseInfo","leaseList")),
+            new HelpPages.Section("admin","tokaland.admin",true,List.of("grant","refund","reset","clear","reload","fac","facHelp")),
+            new HelpPages.Section("facility","tokaland.admin",true,List.of("facCreate","facList","facDel","facType","facMode","facLock")),
+            new HelpPages.Section("inspect","tokaland.inspect",true,List.of("status","adminList","adminInfo"))),(sender,key,args)->plugin.texts().text(sender,key,args));
         setPermission("tokaland.use;tokaland.inspect");
         getCommandParameters().clear();
         addCommandParameters("summary",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandReadAction",new String[]{"status"}))});
         addCommandParameters("help",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandHelpAction",new String[]{"help"})),
-            CommandParameter.newEnum("section",true,new CommandEnum("TokaLandHelpSection",new String[]{"read","manage","sub","admin","facility","inspect"})),CommandParameter.newType("page",true,CommandParamType.INT)});
+            CommandParameter.newType("page",true,CommandParamType.INT)});
         addCommandParameters("set",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandSetAction",new String[]{"set"})),CommandParameter.newType("name",CommandParamType.STRING)});
         addCommandParameters("tpl",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandTplAction",new String[]{"tpl"})),CommandParameter.newType("claim",true,CommandParamType.STRING)});
         for(String action:List.of("rename","give","type"))addCommandParameters(action,new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLand"+action,new String[]{action})),
             action.equals("type")?CommandParameter.newEnum("value",new CommandEnum("TokaLandType",new String[]{"land","pvp"})):CommandParameter.newType("value",CommandParamType.STRING),CommandParameter.newType("claim",true,CommandParamType.STRING)});
-        addCommandParameters("groupEdit",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandGroup",new String[]{"group","grp"})),CommandParameter.newEnum("mode",new CommandEnum("TokaLandGroupEdit",new String[]{"add","del"})),CommandParameter.newType("player",CommandParamType.STRING),CommandParameter.newType("claim",true,CommandParamType.STRING)});
-        addCommandParameters("groupList",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandGroupListAction",new String[]{"group","grp"})),CommandParameter.newEnum("mode",new CommandEnum("TokaLandGroupList",new String[]{"list"})),CommandParameter.newType("claim",true,CommandParamType.STRING)});
+        addCommandParameters("groupEdit",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandGroup",new String[]{"group"})),CommandParameter.newEnum("mode",new CommandEnum("TokaLandGroupEdit",new String[]{"add","del"})),CommandParameter.newType("player",CommandParamType.STRING),CommandParameter.newType("claim",true,CommandParamType.STRING)});
+        addCommandParameters("groupList",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandGroupListAction",new String[]{"group"})),CommandParameter.newEnum("mode",new CommandEnum("TokaLandGroupList",new String[]{"list"})),CommandParameter.newType("claim",true,CommandParamType.STRING)});
         addCommandParameters("del",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandDeleteAction",new String[]{"del"})),CommandParameter.newType("claim",true,CommandParamType.STRING),
             CommandParameter.newEnum("refund",true,new CommandEnum("TokaLandDeleteRefund",new String[]{"norefund"}))});
-        addCommandParameters("facHelp",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandFacilityHelpAction",new String[]{"fac","facility"})),CommandParameter.newEnum("what",new CommandEnum("TokaLandFacilityHelp",new String[]{"help"}))});
-        addCommandParameters("select",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandSelectAction",new String[]{"select","slt"})),CommandParameter.newEnum("mode",new CommandEnum("TokaLandSelectMode",new String[]{"size","vert"}))});
+        addCommandParameters("facHelp",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandFacilityHelpAction",new String[]{"fac"})),CommandParameter.newEnum("what",new CommandEnum("TokaLandFacilityHelp",new String[]{"help"}))});
+        addCommandParameters("select",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandSelectAction",new String[]{"select"})),CommandParameter.newEnum("mode",new CommandEnum("TokaLandSelectMode",new String[]{"size","vert"}))});
         addCommandParameters("list",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandListAction",new String[]{"list"})),CommandParameter.newType("page",true,CommandParamType.INT)});
-        addCommandParameters("facility",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandFacilityAction",new String[]{"fac","facility"})),
+        addCommandParameters("facility",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandFacilityAction",new String[]{"fac"})),
             CommandParameter.newEnum("type",new CommandEnum("TokaLandFacilityType",plugin.facilities().types().names().toArray(new String[0]))),CommandParameter.newType("name",true,CommandParamType.STRING)});
-        addCommandParameters("facilityList",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandFacilityListAction",new String[]{"fac","facility"})),
+        addCommandParameters("facilityList",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandFacilityListAction",new String[]{"fac"})),
             CommandParameter.newEnum("sub",new CommandEnum("TokaLandFacilityList",new String[]{"list"})),CommandParameter.newType("page",true,CommandParamType.INT)});
-        for(String sub:List.of("del","lock"))addCommandParameters("facility"+sub,new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandFacilityAction"+sub,new String[]{"fac","facility"})),
+        for(String sub:List.of("del","lock"))addCommandParameters("facility"+sub,new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandFacilityAction"+sub,new String[]{"fac"})),
             CommandParameter.newEnum("sub",new CommandEnum("TokaLandFacilitySub"+sub,new String[]{sub})),CommandParameter.newType("name",CommandParamType.STRING),
             CommandParameter.newEnum("state",true,new CommandEnum("TokaLandFacilityState"+sub,sub.equals("lock")?new String[]{"on","off"}:new String[]{"confirm"}))});
-        addCommandParameters("facilitytype",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandFacilityActiontype",new String[]{"fac","facility"})),
+        addCommandParameters("facilitytype",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandFacilityActiontype",new String[]{"fac"})),
             CommandParameter.newEnum("sub",new CommandEnum("TokaLandFacilitySubtype",new String[]{"type"})),CommandParameter.newType("name",CommandParamType.STRING),
             CommandParameter.newEnum("type",new CommandEnum("TokaLandFacilityTypeValue",plugin.facilities().types().names().toArray(new String[0])))});
-        addCommandParameters("facilitymode",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandFacilityActionmode",new String[]{"fac","facility"})),
+        addCommandParameters("facilitymode",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandFacilityActionmode",new String[]{"fac"})),
             CommandParameter.newEnum("sub",new CommandEnum("TokaLandFacilitySubmode",new String[]{"mode"})),CommandParameter.newType("name",CommandParamType.STRING),
             CommandParameter.newEnum("value",new CommandEnum("TokaLandFacilityModeValue",new String[]{"open","protect","private"}))});
-        addCommandParameters("menu",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandMenuAction",new String[]{"menu","gui"}))});
+        addCommandParameters("menu",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandMenuAction",new String[]{"menu"}))});
         addLeaseParameters();
         addCommandParameters("sub",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandSubAction",new String[]{"sub"})),CommandParameter.newType("name",CommandParamType.STRING)});
         addCommandParameters("reload",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandReloadAction",new String[]{"reload"}))});
@@ -129,7 +129,7 @@ public final class LandCommand extends Command {
             var found=plugin.getClaim(id);
             if(found.isEmpty()){send(sender,"command.notFound",id);return true;}
             var claim=found.get();
-            send(sender,"command.info",claim.id(),claim.displayName(plugin.texts().language(sender)),plugin.texts().ownerText(claim,plugin.texts().language(sender)),claim.world(),claim.kind(),claim.type(),claim.accessPolicy().mode()+(claim.accessPolicy().locked()?" + LOCK":""),claim.selections().size());
+            sender.sendMessage(plugin.texts().claimInfo(claim,plugin.texts().language(sender)));
             for(var part:claim.selections())send(sender,"command.selection",part.id(),part.minX(),part.minY(),part.minZ(),part.maxX(),part.maxY(),part.maxZ(),part.ignoreHeight());
             return true;
         }
@@ -236,7 +236,7 @@ public final class LandCommand extends Command {
                     if(args.length==4&&!on&&!args[3].equalsIgnoreCase("off")){send(player,"command.usage");return true;}
                     facilities.lock(player,args[2],on).whenComplete((r,e)->done(player,e,on?"facility.locked":"facility.unlocked",args[2]));
                 }
-                case "help" -> help.show(player,new String[]{"facility"});
+                case "help" -> help.showTopic(player,"facility");
                 default -> send(player,"command.usage");
             }
         }catch(NumberFormatException invalid){send(player,"command.invalidPage");}

@@ -96,6 +96,11 @@ public final class Providers {
         }
     }
 
+    /** Takes the pricing provider back, when it is the one that asks (a plugin that is reloading or stopping) */
+    public void unregisterPricing(String name) {
+        if (pricing != null && pricing.pluginName().equals(name)) { pricing = null; pricingLostSince = 0; fallbackLogged = false; }
+    }
+
     /**
      * Region rules and price adjustments are optional: without a provider Land uses its own defaults.
      */
