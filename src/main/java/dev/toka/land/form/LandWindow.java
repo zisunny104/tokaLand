@@ -6,6 +6,7 @@ import cn.nukkit.event.Listener;
 import cn.nukkit.event.player.PlayerFormRespondedEvent;
 import cn.nukkit.event.player.PlayerQuitEvent;
 import cn.nukkit.form.element.ElementDropdown;
+import cn.nukkit.form.element.ElementHeader;
 import cn.nukkit.form.element.ElementInput;
 import cn.nukkit.form.response.FormResponse;
 import cn.nukkit.form.response.FormResponseCustom;
@@ -69,8 +70,9 @@ public final class LandWindow implements Listener {
     /** The shared search window: one input; the handler gets the query (blank clears the search). */
     void searchForm(Player player, String current, Consumer<String> apply) {
         var window = new FormWindowCustom(text(player, "window.search"));
+        window.addElement(new ElementHeader(text(player, "window.search")));
         window.addElement(new ElementInput(text(player, "window.searchLabel"), text(player, "window.searchHint"), current));
-        custom(player, window, response -> apply.accept(response.getInputResponse(0) == null ? "" : response.getInputResponse(0).strip()));
+        custom(player, window, response -> apply.accept(response.getInputResponse(1) == null ? "" : response.getInputResponse(1).strip()));
     }
 
     /**
@@ -162,9 +164,10 @@ public final class LandWindow implements Listener {
 
     private void renameForm(Player player, LandClaim claim) {
         var window = new FormWindowCustom(text(player, "window.rename"));
+        window.addElement(new ElementHeader(text(player, "window.rename")));
         window.addElement(new ElementInput(text(player, "window.newName"), "", claim.name()));
         custom(player, window, response -> {
-            String name = response.getInputResponse(0) == null ? "" : response.getInputResponse(0).strip();
+            String name = response.getInputResponse(1) == null ? "" : response.getInputResponse(1).strip();
             if (!LeaseInput.commandSafe(name)) { player.sendMessage(text(player, "window.badName")); renameForm(player, claim); return; }
             run(player, "land rename " + name + " " + claim.id());
         });
@@ -172,12 +175,13 @@ public final class LandWindow implements Listener {
 
     private void membersForm(Player player, LandClaim claim) {
         var window = new FormWindowCustom(text(player, "window.members"));
+        window.addElement(new ElementHeader(text(player, "window.members")));
         window.addElement(new ElementDropdown(text(player, "window.memberMode"),
                 List.of(text(player, "window.memberAdd"), text(player, "window.memberDel"), text(player, "window.memberList"))));
         window.addElement(new ElementInput(text(player, "window.memberName"), "", ""));
         custom(player, window, response -> {
-            int mode = response.getDropdownResponse(0).getElementID();
-            String who = response.getInputResponse(1) == null ? "" : response.getInputResponse(1).strip();
+            int mode = response.getDropdownResponse(1).getElementID();
+            String who = response.getInputResponse(2) == null ? "" : response.getInputResponse(2).strip();
             if (mode == 2) { run(player, "land group list " + claim.id()); return; }
             if (!LeaseInput.commandSafe(who)) { player.sendMessage(text(player, "window.badName")); membersForm(player, claim); return; }
             run(player, "land group " + (mode == 0 ? "add " : "del ") + who + " " + claim.id());

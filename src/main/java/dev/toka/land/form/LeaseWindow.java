@@ -1,7 +1,9 @@
 package dev.toka.land.form;
 
 import cn.nukkit.Player;
+import cn.nukkit.form.element.ElementDivider;
 import cn.nukkit.form.element.ElementDropdown;
+import cn.nukkit.form.element.ElementHeader;
 import cn.nukkit.form.element.ElementInput;
 import cn.nukkit.form.element.ElementLabel;
 import cn.nukkit.form.element.ElementSlider;
@@ -68,10 +70,11 @@ final class LeaseWindow {
         var tool = plugin.selectionTool();
         boolean selected = tool != null && tool.get(player.getUniqueId()) != null;
         var window = new FormWindowCustom(t(player, "window.createSub"));
+        window.addElement(new ElementHeader(t(player, "window.createSub")));
         window.addElement(new ElementLabel(t(player, selected ? "lw.selectionYes" : "lw.selectionNo")));
         window.addElement(new ElementInput(t(player, "lw.subName"), "", ""));
         host.custom(player, window, response -> {
-            String name = text(response, 1);
+            String name = text(response, 2);
             if (!LeaseInput.commandSafe(name)) { player.sendMessage(t(player, "window.badName")); subForm(player); return; }
             plugin.leases().createSub(player, name);
         });
@@ -91,21 +94,23 @@ final class LeaseWindow {
         List<String> dayNames = days.stream().map(d -> d < 0 ? t(player, "lease.noTerm") : d + " " + t(player, "lease.days")).toList();
         int defaultDays = Math.max(0, days.indexOf(config.getInt("lease.period-days", 90)));
         var window = new FormWindowCustom(t(player, "lw.offer"));
+        window.addElement(new ElementHeader(t(player, "lw.offer")));
         window.addElement(new ElementDropdown(t(player, "lw.sub"), subs.stream().map(LandClaim::name).toList(), chosen));
         window.addElement(new ElementInput(t(player, "lw.rent"), "100", ""));
         window.addElement(new ElementDropdown(t(player, "lw.days"), dayNames, defaultDays));
         addTerms(player, window, config.getInt("lease.max-periods", 12), true, config.getInt("lease.grace-days", 7), "0", "0");
         host.custom(player, window, response -> {
-            LandClaim sub = subs.get(Math.min(response.getDropdownResponse(0).getElementID(), subs.size() - 1));
-            Long rent = parseLong(text(response, 1));
-            LeaseTerms terms = readTerms(response, 3);
+            LandClaim sub = subs.get(Math.min(response.getDropdownResponse(1).getElementID(), subs.size() - 1));
+            Long rent = parseLong(text(response, 2));
+            LeaseTerms terms = readTerms(response, 5);
             if (rent == null || rent < 1 || terms == null) { player.sendMessage(t(player, "lease.badNumber")); offerForm(player, sub.id()); return; }
-            plugin.leases().offer(player, sub.name(), rent, days.get(response.getDropdownResponse(2).getElementID()), terms);
+            plugin.leases().offer(player, sub.name(), rent, days.get(response.getDropdownResponse(3).getElementID()), terms);
         });
     }
 
     /** Elements from {@code first} on: max periods slider, renew toggle, grace slider, discount after, discount percent. */
     private void addTerms(Player player, FormWindowCustom window, int max, boolean renew, int grace, String after, String percent) {
+        window.addElement(new ElementDivider());
         window.addElement(new ElementSlider(t(player, "lw.maxPeriods"), 1, LeaseTerms.MAX_PERIODS, 1, LeaseTerms.clampPeriods(max)));
         window.addElement(new ElementToggle(t(player, "lw.autoRenew"), renew));
         window.addElement(new ElementSlider(t(player, "lw.grace"), 0, LeaseTerms.MAX_GRACE, 1, LeaseTerms.clampGrace(grace)));
@@ -152,11 +157,12 @@ final class LeaseWindow {
         Lease lease = plugin.leases().leaseOf(UUID.fromString(claimId));
         if (lease == null) { myOffers(player, 0); return; }
         var window = new FormWindowCustom(claimName(lease));
+        window.addElement(new ElementHeader(t(player, "lw.editTerms")));
         window.addElement(new ElementInput(t(player, "lw.rent"), "100", String.valueOf(lease.rent)));
         addTerms(player, window, lease.maxPeriods, lease.autoRenew, lease.graceDays, String.valueOf(lease.discountAfter), String.valueOf(lease.discountPercent));
         host.custom(player, window, response -> {
-            Long rent = parseLong(text(response, 0));
-            LeaseTerms terms = readTerms(response, 1);
+            Long rent = parseLong(text(response, 1));
+            LeaseTerms terms = readTerms(response, 3);
             if (rent == null || rent < 1 || terms == null) { player.sendMessage(t(player, "lease.badNumber")); editForm(player, claimId); return; }
             plugin.leases().update(player, claimName(lease), rent, terms);
         });
@@ -187,6 +193,7 @@ final class LeaseWindow {
             catch (ArithmeticException tooBig) { break; }
         }
         var window = new FormWindowCustom(name);
+        window.addElement(new ElementHeader(t(player, "lw.openLettings")));
         window.addElement(new ElementLabel(t(player, "lw.rentInfo", LeaseInput.money(lease.rent), period(player, lease), max)));
         window.addElement(new ElementDropdown(t(player, "lw.periods"), options));
         if (!lease.perpetual()) {
@@ -194,10 +201,10 @@ final class LeaseWindow {
             window.addElement(new ElementInput(t(player, "lw.endDate"), "yyyy-MM-dd", ""));
         }
         host.custom(player, window, response -> {
-            int periods = response.getDropdownResponse(1).getElementID() + 1;
+            int periods = response.getDropdownResponse(2).getElementID() + 1;
             LocalDate start = null, end = null;
             try {
-                if (!lease.perpetual()) { start = LeaseInput.parseDate(text(response, 2)); end = LeaseInput.parseDate(text(response, 3)); }
+                if (!lease.perpetual()) { start = LeaseInput.parseDate(text(response, 3)); end = LeaseInput.parseDate(text(response, 4)); }
             } catch (DateTimeParseException invalid) { player.sendMessage(t(player, "lw.badDate")); rentForm(player, claimId); return; }
             LocalDate from = start == null ? LeaseInput.today(zone()) : start;
             String until = lease.perpetual() ? t(player, "lease.noTerm") : LeaseInput.endDate(from, periods, lease.periodDays).toString();
