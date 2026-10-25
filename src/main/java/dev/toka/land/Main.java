@@ -140,6 +140,7 @@ public final class Main extends PluginBase {
 
     @Override public void onDisable() {
         ready = false;
+        if (legacyLink != null) legacyLink.disconnect();
         try {
             closeAll();
         } finally {
