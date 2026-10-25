@@ -64,6 +64,25 @@ public final class Trading implements Listener, AutoCloseable {
                 .orElse(plugin.getConfig().getBoolean("selection.default-ignore-height", false));
     }
 
+    /** What a selection holds and what it would cost, both as footprint and as volume; the area decides which of the two is charged. */
+    public record Preview(long area, long volume, long flatPrice, long volumePrice, boolean flat) { }
+
+    public Preview preview(Player player, SelectionToolListener.Selection draft) {
+        var part = draft.geometry();
+        JsonObject request = new JsonObject();
+        request.addProperty("action", "ADJUST");
+        request.add("first", GSON.toJsonTree(draft.first()));
+        request.add("second", GSON.toJsonTree(draft.second()));
+        request.addProperty("ignoreHeight", draft.ignoreHeight());
+        request.addProperty("ownedCount", plugin.index().ownedBy(player.getUniqueId()).size());
+        JsonObject none = new JsonObject();
+        none.addProperty("offer", 1.0);
+        none.addProperty("tax", 1.0);
+        JsonObject adjustment = plugin.providers().ask(player, request).orElse(none);
+        double offer = adjustment.get("offer").getAsDouble(), tax = adjustment.get("tax").getAsDouble();
+        return new Preview(LandPricing.area(part), LandPricing.volume(part), pricing.quoteFlat(part, offer, tax), pricing.quoteVolume(part, offer, tax), draft.ignoreHeight());
+    }
+
     public CompletableFuture<PurchaseCoordinator.Outcome> purchase(Player player, String name) {
         plugin.requirePrimaryThread();
         if (!Main.ownsLand() || plugin.maintenanceLocked()) throw new IllegalStateException("LAND_NOT_ACTIVE");

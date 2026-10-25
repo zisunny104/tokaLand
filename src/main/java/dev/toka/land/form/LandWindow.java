@@ -14,6 +14,7 @@ import cn.nukkit.form.response.FormResponseModal;
 import cn.nukkit.form.window.FormWindow;
 import cn.nukkit.form.window.FormWindowCustom;
 import cn.nukkit.form.window.FormWindowModal;
+import dev.toka.land.BoundingBoxLink;
 import dev.toka.land.Main;
 import dev.toka.land.lease.Lease;
 import dev.toka.land.lease.LeaseInput;
@@ -151,6 +152,7 @@ public final class LandWindow implements Listener {
         // The way there is tokaPortal's, and only a claim with a teleport point can be gone to.
         if (claim.details().teleport() != null && portal() != null) menu.button(text(player, "window.teleport"), "textures/items/ender_pearl", () -> goTo(player, claim));
         if (mine) {
+            menu.button(text(player, "window.showBounds"), "textures/ui/world_glyph_color", () -> showBounds(player, claim));
             menu.button(text(player, "window.rename"), "textures/items/name_tag", () -> renameForm(player, claim));
             menu.button(text(player, "window.members"), "textures/ui/FriendsIcon", () -> membersForm(player, claim));
             menu.button(text(player, "window.createSub"), "textures/items/map_filled", () -> lease.subForm(player));
@@ -160,6 +162,13 @@ public final class LandWindow implements Listener {
         }
         if (tenant) menu.button(text(player, "lw.release"), "textures/items/gold_ingot", () -> lease.rentalDetail(player, held));
         menu.show();
+    }
+
+    /** Draws the claim's area for this player with BoundingBoxAPI; a claim that is made of several parts shows each part. */
+    private void showBounds(Player player, LandClaim claim) {
+        int part = 0;
+        for (var selection : claim.selections()) BoundingBoxLink.show(plugin, player, selection, selection.ignoreHeight(), "land-" + claim.id() + "-" + part++);
+        player.sendMessage(text(player, "window.boundsShown", claim.displayName(plugin.texts().language(player))));
     }
 
     private void renameForm(Player player, LandClaim claim) {

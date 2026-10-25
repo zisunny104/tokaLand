@@ -148,9 +148,7 @@ public final class LandCommand extends Command {
                 var draft=tool.get(player.getUniqueId());if(draft==null)throw new IllegalStateException("SELECTION_REQUIRED");
                 if(args[1].equalsIgnoreCase("vert")){draft=tool.toggleHeight(player.getUniqueId());send(sender,"purchase.height",draft.ignoreHeight());return true;}
                 if(args[1].equalsIgnoreCase("size")){
-                    var part=draft.geometry();long size=Math.multiplyExact((long)part.maxX()-part.minX()+1,(long)part.maxZ()-part.minZ()+1);
-                    if(!part.ignoreHeight())size=Math.multiplyExact(size,(long)part.maxY()-part.minY()+1);
-                    send(sender,"purchase.size",size);return true;
+                    tool.announce(player,draft);return true;
                 }
             }
             if(action.equals("set")&&args.length>=2){

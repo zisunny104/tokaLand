@@ -1,9 +1,9 @@
 name: tokaLand
 main: dev.toka.land.Main
-version: "0.3.6"
+version: "0.3.7"
 api: ["1.0.4"]
 load: POSTWORLD
-softdepend: [tokaDisplay, tokaProfiles, tokaWorlds, tokaEconomy]
+softdepend: [BoundingBoxAPI, tokaDisplay, tokaProfiles, tokaWorlds, tokaEconomy]
 permissions:
   tokaland.use:
     description: 使用領地選區與建地指令，仍受計價及領地規則檢查

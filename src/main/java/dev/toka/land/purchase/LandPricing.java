@@ -21,6 +21,26 @@ public record LandPricing(String currency, double perBlock, double perBlockFlat,
         return part.ignoreHeight() ? area : Math.multiplyExact(area, (long) part.maxY() - part.minY() + 1);
     }
 
+    /** Blocks of the footprint. */
+    public static long area(LandSelection part) {
+        return Math.multiplyExact((long) part.maxX() - part.minX() + 1, (long) part.maxZ() - part.minZ() + 1);
+    }
+
+    /** Blocks of the whole box, from the lowest to the highest selected layer. */
+    public static long volume(LandSelection part) {
+        return Math.multiplyExact(area(part), (long) part.maxY() - part.minY() + 1);
+    }
+
+    /** What the footprint alone would cost, with the provider's discount and tax; shown next to the volume price. */
+    public long quoteFlat(LandSelection part, double offer, double tax) {
+        return (long) (area(part) * perBlockFlat * offer * tax);
+    }
+
+    /** What the whole box would cost, with the provider's discount and tax. */
+    public long quoteVolume(LandSelection part, double offer, double tax) {
+        return (long) (volume(part) * perBlock * offer * tax);
+    }
+
     private double base(LandSelection part) {
         long size = size(part);
         if (size > Integer.MAX_VALUE) throw new IllegalArgumentException("SELECTION_TOO_LARGE");

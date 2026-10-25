@@ -21,7 +21,6 @@ management:
 purchase:
   teleportSet: "§a[領地] 領地傳送點設置完成，接著使用 /land set <領地名稱>。"
   height: "§b[領地] 忽略高度：${0}；請重新設定傳送點。"
-  size: "§b[領地] 選區大小：${0} 單位。"
   started: "§b[領地] 正在處理購地交易，請等待結果。"
   result: "§b[領地] 交易狀態：${0}；編號：${1}；${2}"
   unavailable: "§e[領地] 尚未完成：${0}"
@@ -59,6 +58,9 @@ window:
   searchHint: "留空顯示全部"
   leaseMenu: "租賃"
   rented: "承租"
+  showBounds: "顯示範圍"
+  # ${0}=領地名稱
+  boundsShown: "§b[領地] 已顯示「${0}」的範圍。"
   rename: "更名"
   newName: "新名稱（不含空白）"
   badName: "§c名稱不可為空、不可含空白，最長 32 字。"
@@ -98,6 +100,8 @@ facility:
 selection:
   first: "§a選區第一點：${0} (${1}, ${2}, ${3})"
   second: "§a選區第二點：${0} (${1}, ${2}, ${3})"
+  # ${0}=平面方塊數 ${1}=立體方塊數 ${2}=平面價 ${3}=立體價；實際計價的那個用一般顏色，另一個是深灰
+  summary: "§b[領地] 選區 [${0}|${1}]　價格 ${2}|${3} 銀幣"
 ui:
   land: "§8[領地]§r${0} §8[擁有者]§r${1}"
   pending: "${0} §8legacy§r"

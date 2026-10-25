@@ -61,12 +61,20 @@ public final class SelectionToolListener implements Listener {
             Point other=previous==null?null:first?previous.second():previous.first();
             if(other!=null&&!other.world().equals(point.world()))other=null;
             var updated=first?new Selection(point,other,ignoreHeight,null):new Selection(other,point,ignoreHeight,null);
-            selections.put(player.getUniqueId(),updated);plugin.texts().sendSelectionPoint(player,first,point);
+            selections.put(player.getUniqueId(),updated);plugin.texts().sendSelectionPoint(player,first,point);announce(player,updated);
         }catch(RuntimeException failure){player.sendMessage(plugin.texts().text(player,"purchase.unavailable",failure.getMessage()));}
     }
     public Selection toggleHeight(UUID player){
         Selection old=selections.get(player);if(old==null)throw new IllegalStateException("SELECTION_REQUIRED");
-        var changed=new Selection(old.first(),old.second(),!old.ignoreHeight(),null);selections.put(player,changed);return changed;
+        var changed=new Selection(old.first(),old.second(),!old.ignoreHeight(),null);selections.put(player,changed);
+        plugin.getServer().getPlayer(player).ifPresent(online->announce(online,changed));return changed;
+    }
+    /** With both corners set: the size and price line in chat, and the box of the selection drawn for this player. */
+    public void announce(Player player,Selection draft){
+        if(draft.first()==null||draft.second()==null||!draft.first().world().equals(draft.second().world()))return;
+        try{plugin.texts().sendSelectionSummary(player,plugin.trading().preview(player,draft));}
+        catch(RuntimeException failure){player.sendMessage(plugin.texts().text(player,"purchase.unavailable",failure.getMessage()));}
+        dev.toka.land.BoundingBoxLink.show(plugin,player,draft.geometry(),draft.ignoreHeight(),"land-selection");
     }
     public void teleport(UUID player,TeleportPoint point){
         Selection old=selections.get(player);if(old==null)throw new IllegalStateException("SELECTION_REQUIRED");

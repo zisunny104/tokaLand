@@ -48,6 +48,17 @@ public final class Texts {
         player.sendMessage(text(player, first ? "selection.first" : "selection.second", point.world(), point.x(), point.y(), point.z()));
     }
 
+    /** One chat line for a finished selection: blocks as [footprint|volume], then the price of each; the one that is not charged is dark grey. */
+    public void sendSelectionSummary(Player player, dev.toka.land.Trading.Preview preview) {
+        String flat = format(preview.flatPrice(), !preview.flat()), volume = format(preview.volumePrice(), preview.flat());
+        player.sendMessage(text(player, "selection.summary", format(preview.area(), false), format(preview.volume(), false), flat, volume));
+    }
+
+    private static String format(long number, boolean dim) {
+        String shown = String.format(java.util.Locale.ROOT, "%,d", number);
+        return dim ? "§8" + shown + "§b" : shown;
+    }
+
     /** Everything that identifies a claim, with what each id belongs to; one line per fact. */
     public String claimInfo(LandClaim claim, String language) {
         String none = message(language, "tools.i.none");

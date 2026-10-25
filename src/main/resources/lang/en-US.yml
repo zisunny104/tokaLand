@@ -21,7 +21,6 @@ management:
 purchase:
   teleportSet: "§a[Land] Teleport point set. Use /land set <name> to purchase."
   height: "§b[Land] Ignore height: ${0}. Set the teleport point again."
-  size: "§b[Land] Selection size: ${0} units."
   started: "§b[Land] Processing the purchase. Please wait for its result."
   result: "§b[Land] Transaction: ${0}; ID: ${1}; ${2}"
   unavailable: "§e[Land] Not completed: ${0}"
@@ -59,6 +58,9 @@ window:
   searchHint: "Leave empty to show all"
   leaseMenu: "Leases"
   rented: "rented"
+  showBounds: "Show bounds"
+  # ${0}=claim name
+  boundsShown: "§b[Land] Showing the bounds of ${0}."
   rename: "Rename"
   newName: "New name (no spaces)"
   badName: "§cThe name cannot be empty or contain spaces, 32 characters at most."
@@ -98,6 +100,8 @@ facility:
 selection:
   first: "§aSelection point 1: ${0} (${1}, ${2}, ${3})"
   second: "§aSelection point 2: ${0} (${1}, ${2}, ${3})"
+  # ${0}=flat blocks ${1}=volume blocks ${2}=flat price ${3}=volume price; the one that is charged is plain, the other dark grey
+  summary: "§b[Land] Selection [${0}|${1}]  Price ${2}|${3} silver"
 ui:
   land: "§8[Land]§r${0} §8[Owner]§r${1}"
   pending: "${0} §8legacy§r"
