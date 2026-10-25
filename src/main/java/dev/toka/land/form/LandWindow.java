@@ -35,16 +35,22 @@ public final class LandWindow implements Listener {
     record Row(String text, String icon, Runnable action) {}
     private final Main plugin;
     private final LeaseWindow lease;
+    private final AuctionWindow auction;
     private final Map<FormWindow, Entry> open = Collections.synchronizedMap(new WeakHashMap<>());
 
     public LandWindow(Main plugin) {
         this.plugin = plugin;
         this.lease = new LeaseWindow(plugin, this);
+        this.auction = new AuctionWindow(plugin, this, lease);
     }
 
     public void open(Player player) { list(player, 0, ""); }
 
     public void leaseMenu(Player player) { lease.menu(player); }
+
+    public void auctionMenu(Player player) { auction.list(player, 0, "", () -> open(player)); }
+
+    void auctionMine(Player player) { auction.mine(player, 0, () -> lease.menu(player)); }
 
     String text(Player player, String key, Object... args) { return plugin.texts().text(player, key, args); }
 
@@ -95,7 +101,7 @@ public final class LandWindow implements Listener {
 
     // ---- claim list ----
 
-    String stateText(Player player, Lease state) { return text(player, "window.state." + state.state); }
+    String stateText(Player player, Lease state) { return text(player, "window.state." + (state.auctionId != null && Lease.VACANT.equals(state.state) ? "AUCTION" : state.state)); }
 
     static String icon(LandClaim claim, boolean rented) {
         if (rented) return "textures/items/gold_ingot";
@@ -130,7 +136,8 @@ public final class LandWindow implements Listener {
         }
         List<Row> fixed = List.of(
                 new Row(text(player, "window.search"), "textures/ui/magnifyingGlass", () -> searchForm(player, query, q -> list(player, 0, q))),
-                new Row(text(player, "window.leaseMenu"), "textures/items/emerald", () -> lease.menu(player)));
+                new Row(text(player, "window.leaseMenu"), "textures/items/emerald", () -> lease.menu(player)),
+                new Row(text(player, "aw.title"), "textures/items/gold_nugget", () -> auction.list(player, 0, "", () -> list(player, page, query))));
         String info = rows.isEmpty() ? text(player, "window.empty") : text(player, "window.listText", rows.size())
                 + (query.isEmpty() ? "" : "\n" + text(player, "window.filter", query));
         paged(player, text(player, "window.title"), info, fixed, rows, page, p -> list(player, p, query), query.isEmpty() ? null : () -> list(player, 0, ""));
@@ -157,6 +164,7 @@ public final class LandWindow implements Listener {
             menu.button(text(player, "window.members"), "textures/ui/FriendsIcon", () -> membersForm(player, claim));
             menu.button(text(player, "window.createSub"), "textures/items/map_filled", () -> lease.subForm(player));
             if (claim.parentClaimId() != null) menu.button(text(player, "window.offer"), "textures/items/emerald", () -> lease.offerForm(player, id));
+            if (claim.parentClaimId() != null) menu.button(text(player, "aw.start"), "textures/items/gold_nugget", () -> auction.startForm(player, id));
             menu.button(text(player, "window.delete"), "textures/ui/trash", () -> confirm(player, text(player, "window.delete"),
                     text(player, "window.deleteText", claim.name()), () -> run(player, "land del " + id)));
         }

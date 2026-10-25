@@ -47,6 +47,9 @@ public final class Trading implements Listener, AutoCloseable {
                 config.getDouble("pricing.per-block-flat", 73.1), config.getDouble("pricing.refund-rate", 0.7));
     }
 
+    /** The payment link to tokaEconomy, or null while it is not connected */
+    public EconomyLedger ledger() { return ledger; }
+
     public boolean hasPending() { return purchases.hasPending() || sales.hasPending(); }
 
     public boolean hasPending(UUID claimId) { return purchases.hasPending(claimId) || sales.hasPending(claimId); }

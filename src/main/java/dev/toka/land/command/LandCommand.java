@@ -25,6 +25,7 @@ public final class LandCommand extends Command {
             new HelpPages.Section("basics","tokaland.use",false,List.of("menu","info","list","select","set","tpl","rename","del")),
             new HelpPages.Section("manage","tokaland.use",true,List.of("give","type","group","note")),
             new HelpPages.Section("sub","tokaland.use",true,List.of("sub","leaseMenu","leaseOffer","leaseSet","leaseCancel","leaseRent","leaseRelease","leaseInfo","leaseList")),
+            new HelpPages.Section("auction","tokaland.use",true,List.of("auctionMenu","auctionStart","auctionBid","auctionCancel","auctionList","auctionInfo")),
             new HelpPages.Section("admin","tokaland.admin",true,List.of("grant","refund","reset","clear","reload","fac","facHelp")),
             new HelpPages.Section("facility","tokaland.admin",true,List.of("facCreate","facList","facDel","facType","facMode","facLock")),
             new HelpPages.Section("inspect","tokaland.inspect",true,List.of("status","adminList","adminInfo"))),(sender,key,args)->plugin.texts().text(sender,key,args));
@@ -59,6 +60,7 @@ public final class LandCommand extends Command {
             CommandParameter.newEnum("value",new CommandEnum("TokaLandFacilityModeValue",new String[]{"open","protect","private"}))});
         addCommandParameters("menu",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandMenuAction",new String[]{"menu"}))});
         addLeaseParameters();
+        addAuctionParameters();
         addCommandParameters("sub",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandSubAction",new String[]{"sub"})),CommandParameter.newType("name",CommandParamType.STRING)});
         addCommandParameters("reload",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandReloadAction",new String[]{"reload"}))});
         addCommandParameters("localInfo",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandLocalInfoAction",new String[]{"info"}))});
@@ -87,6 +89,18 @@ public final class LandCommand extends Command {
             CommandParameter.newEnum("end",true,new CommandEnum("TokaLandLeaseEnd",new String[]{"end"})),CommandParameter.newType("endDate",true,CommandParamType.STRING)});
         addCommandParameters("leaseList",new CommandParameter[]{CommandParameter.newEnum("action",word),sub.apply("list")});
     }
+    /** One overload per auction subcommand so the client completes the words and number slots */
+    private void addAuctionParameters(){
+        var word=new CommandEnum("TokaLandAuctionAction",new String[]{"auction"});
+        java.util.function.Function<String,CommandParameter> sub=name->CommandParameter.newEnum("sub",new CommandEnum("TokaLandAuction_"+name,new String[]{name}));
+        addCommandParameters("auctionMenu",new CommandParameter[]{CommandParameter.newEnum("action",word)});
+        addCommandParameters("auctionStart",new CommandParameter[]{CommandParameter.newEnum("action",word),sub.apply("start"),CommandParameter.newType("claim",CommandParamType.STRING),
+            CommandParameter.newType("startPrice",CommandParamType.INT),CommandParameter.newType("hours",true,CommandParamType.INT)});
+        addCommandParameters("auctionBid",new CommandParameter[]{CommandParameter.newEnum("action",word),sub.apply("bid"),CommandParameter.newType("claimOrId",CommandParamType.STRING),CommandParameter.newType("amount",CommandParamType.INT)});
+        addCommandParameters("auctionCancel",new CommandParameter[]{CommandParameter.newEnum("action",word),sub.apply("cancel"),CommandParameter.newType("claim",CommandParamType.STRING)});
+        addCommandParameters("auctionList",new CommandParameter[]{CommandParameter.newEnum("action",word),sub.apply("list"),CommandParameter.newType("page",true,CommandParamType.INT)});
+        addCommandParameters("auctionInfo",new CommandParameter[]{CommandParameter.newEnum("action",word),sub.apply("info"),CommandParameter.newType("idOrName",CommandParamType.STRING)});
+    }
     @Override public boolean execute(CommandSender sender,String label,String[] args) {
         if(!testPermissionSilent(sender)){send(sender,"command.denied");return true;}
         String action=args.length==0?"help":args[0].toLowerCase(Locale.ROOT);
@@ -99,6 +113,7 @@ public final class LandCommand extends Command {
         if(Set.of("rename","give","type","group","grp","del").contains(action)
                 ||action.equals("tpl")&&sender instanceof Player p&&(args.length>1||!plugin.management().claimsAround(p).isEmpty()))return manage(sender,action,args);
         if(action.equals("sub")||action.equals("lease"))return plugin.leases().command(sender,args);
+        if(action.equals("auction"))return plugin.auctions().command(sender,args);
         if(action.equals("fac")||action.equals("facility"))return facilityCommand(sender,args);
         if(Set.of("set","tpl","select","slt").contains(action))return purchaseCommand(sender,action,args);
         if(sender instanceof Player self&&sender.hasPermission("tokaland.use")){

@@ -35,6 +35,7 @@ public final class Main extends PluginBase {
     private ProtectionQueries queries;
     private Trading trading;
     private dev.toka.land.lease.Leases leases;
+    private dev.toka.land.lease.Auctions auctions;
     private Management management;
     private Facilities facilities;
     private DatasetAPI dataset;
@@ -73,6 +74,7 @@ public final class Main extends PluginBase {
             trading = new Trading(this, lands, store);
             management = new Management(this, lands, trading, playerNames);
             leases = new dev.toka.land.lease.Leases(this, new dev.toka.land.lease.LeaseBook(store));
+            auctions = new dev.toka.land.lease.Auctions(this, leases, new dev.toka.land.lease.AuctionBook(store));
             facilities = new Facilities(this, lands, config);
             dataset = new DatasetAPI(lands, trading);
             topbar = new TopbarService(this);
@@ -87,6 +89,7 @@ public final class Main extends PluginBase {
                 trading.maintain();
                 if (leases != null && ownership) leases.maintain();
             }, 200);
+            getServer().getScheduler().scheduleRepeatingTask(this, () -> { if (auctions != null && ownership) auctions.tick(); }, 20);
             texts.info("log.loaded", lands.snapshot().index().all().size());
         } catch (Exception error) {
             ready = false;
@@ -152,6 +155,7 @@ public final class Main extends PluginBase {
         }
         if (topbar != null) topbar.removeAll();
         // Leases first: a rent still in flight must not write into a store that is closing.
+        if (auctions != null) auctions.close();
         if (leases != null) leases.close();
         try {
             if (trading != null) trading.close();
@@ -220,6 +224,7 @@ public final class Main extends PluginBase {
     public Management management() { return management; }
     public Trading trading() { return trading; }
     public dev.toka.land.lease.Leases leases() { return leases; }
+    public dev.toka.land.lease.Auctions auctions() { return auctions; }
     public Facilities facilities() { return facilities; }
     public Texts texts() { return texts; }
     public ProtectionQueries queries() { return queries; }

@@ -35,7 +35,7 @@ final class LeaseWindow {
 
     private String t(Player player, String key, Object... args) { return host.text(player, key, args); }
 
-    private String zone() { return plugin.getConfig().getString("lease.timezone", "Asia/Taipei"); }
+    String zone() { return plugin.getConfig().getString("lease.timezone", "Asia/Taipei"); }
 
     private String date(long millis) {
         return millis == 0 ? "-" : Instant.ofEpochMilli(millis).atZone(ZoneId.of(zone())).toLocalDate().toString();
@@ -45,7 +45,7 @@ final class LeaseWindow {
 
     private String claimName(Lease lease) { return plugin.getClaim(UUID.fromString(lease.claimId)).map(LandClaim::name).orElse(lease.claimId); }
 
-    private static String text(FormResponseCustom response, int index) {
+    static String text(FormResponseCustom response, int index) {
         String value = response.getInputResponse(index);
         return value == null ? "" : value.strip();
     }
@@ -57,6 +57,8 @@ final class LeaseWindow {
                 .button(t(player, "window.back"), null, () -> host.open(player))
                 .button(t(player, "lw.openLettings"), "textures/items/emerald", () -> lettings(player, 0, ""))
                 .button(t(player, "lw.myRentals"), COIN, () -> myRentals(player, 0))
+                .button(t(player, "aw.title"), "textures/items/gold_nugget", () -> host.auctionMenu(player))
+                .button(t(player, "aw.mine"), "textures/items/book_enchanted", () -> host.auctionMine(player))
                 .button(t(player, "lw.myOffers"), "textures/items/book_writable", () -> myOffers(player, 0))
                 .button(t(player, "lw.offer"), "textures/items/name_tag", () -> offerForm(player, null))
                 .button(t(player, "window.createSub"), "textures/items/map_filled", () -> subForm(player))
@@ -109,7 +111,7 @@ final class LeaseWindow {
     }
 
     /** Elements from {@code first} on: max periods slider, renew toggle, grace slider, discount after, discount percent. */
-    private void addTerms(Player player, FormWindowCustom window, int max, boolean renew, int grace, String after, String percent) {
+    void addTerms(Player player, FormWindowCustom window, int max, boolean renew, int grace, String after, String percent) {
         window.addElement(new ElementDivider());
         window.addElement(new ElementSlider(t(player, "lw.maxPeriods"), 1, LeaseTerms.MAX_PERIODS, 1, LeaseTerms.clampPeriods(max)));
         window.addElement(new ElementToggle(t(player, "lw.autoRenew"), renew));
@@ -118,14 +120,14 @@ final class LeaseWindow {
         window.addElement(new ElementInput(t(player, "lw.discountPercent"), "0", percent));
     }
 
-    private LeaseTerms readTerms(FormResponseCustom response, int first) {
+    LeaseTerms readTerms(FormResponseCustom response, int first) {
         Long after = parseLong(text(response, first + 3)), percent = parseLong(text(response, first + 4));
         if (after == null || percent == null || after < 0 || percent < 0 || after > 1000 || percent > 100) return null;
         return new LeaseTerms((int) response.getSliderResponse(first), (int) response.getSliderResponse(first + 2), response.getToggleResponse(first + 1),
                 after.intValue(), percent.intValue());
     }
 
-    private static Long parseLong(String text) {
+    static Long parseLong(String text) {
         try { return Long.parseLong(text); } catch (NumberFormatException invalid) { return null; }
     }
 
@@ -172,7 +174,7 @@ final class LeaseWindow {
 
     private void lettings(Player player, int page, String query) {
         List<Row> rows = new ArrayList<>();
-        plugin.leases().allLeases().stream().filter(lease -> Lease.VACANT.equals(lease.state))
+        plugin.leases().allLeases().stream().filter(lease -> Lease.VACANT.equals(lease.state) && lease.auctionId == null)
                 .filter(lease -> plugin.getClaim(UUID.fromString(lease.claimId)).isPresent())
                 .filter(lease -> LeaseInput.matches(query, claimName(lease), lease.claimId))
                 .sorted(Comparator.comparing(this::claimName, String.CASE_INSENSITIVE_ORDER))

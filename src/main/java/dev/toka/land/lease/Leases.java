@@ -55,9 +55,9 @@ public final class Leases {
 
     private String currency() { return plugin.getConfig().getString("lease.currency", "money"); }
 
-    private String text(CommandSender who, String key, Object... args) { return plugin.texts().text(who, key, args); }
+    String text(CommandSender who, String key, Object... args) { return plugin.texts().text(who, key, args); }
 
-    private void tell(UUID player, String key, Object... args) {
+    void tell(UUID player, String key, Object... args) {
         Player online = plugin.getServer().getPlayer(player).orElse(null);
         if (online != null) plugin.getServer().getScheduler().scheduleTask(plugin, () -> online.sendMessage(text(online, key, args)));
     }
@@ -94,16 +94,16 @@ public final class Leases {
 
     // ---- claims ----
 
-    private Optional<LandClaim> claim(UUID id) { return plugin.getClaim(id); }
+    Optional<LandClaim> claim(UUID id) { return plugin.getClaim(id); }
 
-    private Optional<LandClaim> named(String name) {
+    Optional<LandClaim> named(String name) {
         return plugin.allClaims().stream().filter(c -> c.name().equalsIgnoreCase(name)).findFirst();
     }
 
-    private Optional<UUID> ownerOf(LandClaim claim) { return ClaimAccess.effectiveOwner(plugin.index(), claim.id()); }
+    Optional<UUID> ownerOf(LandClaim claim) { return ClaimAccess.effectiveOwner(plugin.index(), claim.id()); }
 
     /** The rent goes to whoever owns the upper-level claim now, so a claim that changed hands pays its new owner */
-    private UUID lessorOf(Lease lease) {
+    UUID lessorOf(Lease lease) {
         return claim(UUID.fromString(lease.claimId)).flatMap(sub -> claim(sub.parentClaimId())).flatMap(this::ownerOf).orElse(UUID.fromString(lease.lessor));
     }
 
@@ -113,7 +113,7 @@ public final class Leases {
         return plugin.lands().edit(current, after);
     }
 
-    private void persist(Lease lease) {
+    void persist(Lease lease) {
         if (closed) throw new CompletionException(new IllegalStateException("CLOSED"));
         try { book.save(lease); } catch (IOException failure) { throw new CompletionException(failure); }
     }
@@ -178,6 +178,7 @@ public final class Leases {
         UUID lessor = parent == null ? null : ownerOf(parent).orElse(null);
         Lease existing = book.get(sub.id());
         if (lessor == null || (!lessor.equals(player.getUniqueId()) && !player.hasPermission("tokaland.admin"))) { player.sendMessage(text(player, "lease.notOwner")); return; }
+        if (existing != null && existing.auctionId != null) { player.sendMessage(text(player, "auction.running")); return; }
         if (existing != null && !Lease.VACANT.equals(existing.state)) { player.sendMessage(text(player, "lease.busy")); return; }
         if (rent < 1) { player.sendMessage(text(player, "lease.badNumber")); return; }
         int period = days == null ? plugin.getConfig().getInt("lease.period-days", 90) : days;
@@ -206,6 +207,7 @@ public final class Leases {
         Lease lease = sub == null ? null : book.get(sub.id());
         if (lease == null) { player.sendMessage(text(player, "lease.noLease")); return; }
         if (!lease.lessor.equals(player.getUniqueId().toString()) && !player.hasPermission("tokaland.admin")) { player.sendMessage(text(player, "lease.notOwner")); return; }
+        if (lease.auctionId != null) { player.sendMessage(text(player, "auction.running")); return; }
         try {
             switch (key.toLowerCase(Locale.ROOT)) {
                 case "max" -> lease.maxPeriods = LeaseTerms.clampPeriods(Integer.parseInt(value));
@@ -233,6 +235,7 @@ public final class Leases {
         Lease lease = sub == null ? null : book.get(sub.id());
         if (lease == null) { player.sendMessage(text(player, "lease.noLease")); return; }
         if (!lease.lessor.equals(player.getUniqueId().toString()) && !player.hasPermission("tokaland.admin")) { player.sendMessage(text(player, "lease.notOwner")); return; }
+        if (lease.auctionId != null) { player.sendMessage(text(player, "auction.running")); return; }
         if (!Lease.VACANT.equals(lease.state)) { player.sendMessage(text(player, "lease.busy")); return; }
         if (closed) return;
         try { book.delete(sub.id()); player.sendMessage(text(player, "lease.withdrawn", sub.name())); }
@@ -245,6 +248,7 @@ public final class Leases {
         Lease lease = sub == null ? null : book.get(sub.id());
         if (lease == null) { player.sendMessage(text(player, "lease.noLease")); return; }
         if (!lease.lessor.equals(player.getUniqueId().toString()) && !player.hasPermission("tokaland.admin")) { player.sendMessage(text(player, "lease.notOwner")); return; }
+        if (lease.auctionId != null) { player.sendMessage(text(player, "auction.running")); return; }
         if (rent != null && rent < 1) { player.sendMessage(text(player, "lease.badNumber")); return; }
         if (rent != null) lease.rent = rent;
         if (terms != null) terms.applyTo(lease);
@@ -256,6 +260,7 @@ public final class Leases {
     public void rent(Player player, String subName, int periods, LocalDate start, LocalDate endCap) {
         var sub = named(subName).orElse(null);
         Lease lease = sub == null ? null : book.get(sub.id());
+        if (lease != null && lease.auctionId != null) { player.sendMessage(text(player, "auction.running")); return; }
         if (lease == null || !Lease.VACANT.equals(lease.state)) { player.sendMessage(text(player, "lease.notVacant")); return; }
         UUID lessor = lessorOf(lease);
         if (lessor.equals(player.getUniqueId())) { player.sendMessage(text(player, "lease.ownLand")); return; }
@@ -359,6 +364,72 @@ public final class Leases {
         });
     }
 
+    // ---- auctions ----
+
+    /** Holds the sub-claim for the auction; an existing offer stays as it is, otherwise a vacant lease is made so the claim cannot be rented meanwhile */
+    void lockAuction(LandClaim sub, Auction auction) {
+        Lease lease = book.get(sub.id());
+        if (lease == null) {
+            lease = new Lease();
+            lease.claimId = sub.id().toString();
+            lease.lessor = auction.lessor;
+            lease.rent = auction.startPrice;
+            lease.periodDays = auction.terms.periodDays;
+        }
+        if (auction.id.equals(lease.auctionId)) return;
+        lease.auctionId = auction.id;
+        persist(lease);
+    }
+
+    /** Lets the claim go after an auction that ended without a winner; a claim that was not on offer before is no longer listed. Safe to repeat. */
+    void unlockAuction(Auction auction) {
+        Lease lease = book.get(UUID.fromString(auction.claimId));
+        if (lease == null || !auction.id.equals(lease.auctionId)) return;
+        if (!auction.hadOffer && Lease.VACANT.equals(lease.state)) {
+            if (closed) throw new CompletionException(new IllegalStateException("CLOSED"));
+            try { book.delete(UUID.fromString(auction.claimId)); } catch (IOException failure) { throw new CompletionException(failure); }
+            return;
+        }
+        lease.auctionId = null;
+        persist(lease);
+    }
+
+    /** The auction was won and paid: the lease takes the auction's terms with the winning bid as the rent of the first period, and the sub-claim goes to the winner. Safe to repeat; false when the claim is gone. */
+    CompletableFuture<Boolean> startWon(Auction auction) {
+        String marker = "auction:" + auction.id;
+        var current = claim(UUID.fromString(auction.claimId)).orElse(null);
+        if (current == null) return CompletableFuture.completedFuture(false);
+        Lease lease = book.get(current.id());
+        if (lease != null && marker.equals(lease.operation) && Lease.LEASED.equals(lease.state)) return CompletableFuture.completedFuture(true);
+        if (lease == null) lease = new Lease();
+        final Lease next = lease;
+        Lease terms = auction.terms;
+        next.claimId = auction.claimId;
+        next.lessor = auction.lessor;
+        next.rent = auction.price;
+        next.periodDays = terms.periodDays;
+        next.maxPeriods = terms.maxPeriods;
+        next.graceDays = terms.graceDays;
+        next.autoRenew = terms.autoRenew;
+        next.discountAfter = terms.discountAfter;
+        next.discountPercent = terms.discountPercent;
+        next.tenant = auction.leader;
+        next.tenantName = auction.leaderName;
+        next.startAt = auction.leaseAt;
+        next.endCap = 0;
+        next.paidUntil = next.perpetual() ? 0 : auction.leaseAt + next.periodMillis();
+        next.graceUntil = 0;
+        next.operation = marker;
+        UUID winner = UUID.fromString(auction.leader);
+        CompletableFuture<?> flip = winner.equals(current.ownerId()) && !current.inheritOwner() ? CompletableFuture.completedFuture(null) : setTenant(current, winner, auction.leaderName);
+        return flip.thenApply(done -> {
+            next.state = Lease.LEASED;
+            next.auctionId = null;
+            persist(next);
+            return true;
+        });
+    }
+
     // ---- reading ----
 
     public void info(Player player, String subName) {
@@ -377,7 +448,7 @@ public final class Leases {
             var sub = claim(UUID.fromString(lease.claimId)).orElse(null);
             if (sub == null) continue;
             boolean mine = lease.lessor.equals(player.getUniqueId().toString()) || player.getUniqueId().toString().equals(lease.tenant);
-            if (Lease.VACANT.equals(lease.state) || mine)
+            if ((Lease.VACANT.equals(lease.state) && lease.auctionId == null) || mine)
                 rows.add(text(player, "lease.row", sub.name(), lease.state, lease.rent, lease.perpetual() ? text(player, "lease.noTerm") : lease.periodDays + " " + text(player, "lease.days")));
         }
         player.sendMessage(text(player, "lease.listHeader", rows.size()));
@@ -441,11 +512,11 @@ public final class Leases {
         });
     }
 
-    private String formatTime(long millis) {
+    String formatTime(long millis) {
         return millis == 0 ? "-" : Instant.ofEpochMilli(millis).atZone(ZoneId.of(plugin.getConfig().getString("lease.timezone", "Asia/Taipei"))).toLocalDate().toString();
     }
 
-    private static String rootMessage(Throwable error) {
+    static String rootMessage(Throwable error) {
         Throwable root = error;
         while (root.getCause() != null && root.getCause() != root) root = root.getCause();
         return root.getMessage() == null ? root.getClass().getSimpleName() : root.getMessage();

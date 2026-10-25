@@ -13,6 +13,8 @@ public final class Lease {
     private static final Gson GSON = new Gson();
 
     public String claimId, lessor, tenant, tenantName, state = VACANT, operation;
+    /** the auction that holds this vacant sub-claim; while it is set the claim is neither rented nor edited as an offer */
+    public String auctionId;
     public long rent;
     public int periodDays = 90, maxPeriods = 12, graceDays = 7, discountAfter, discountPercent;
     public boolean autoRenew = true;

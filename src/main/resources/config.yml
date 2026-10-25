@@ -69,6 +69,12 @@ lease:
   grace-days: 7 # 欠租後的寬限天數，寬限過了就收回
   allow-perpetual: false # 允許出租人設「沒有期限」的租約（週期天數 -1，只收一次租金）
   timezone: Asia/Taipei # 起訖日使用的時區
+  auction: # 空置下級領地的拍賣：得標價就是第一期租金，其餘租約條件由出租人在拍賣時設定
+    enabled: true # 是否開放拍賣
+    min-hours: 1 # 拍賣最短幾小時
+    max-hours: 168 # 拍賣最長幾小時（最多 168，即 7 天）
+    anti-snipe-seconds: 120 # 結束前這麼多秒內有人出價，就把結束時間延到該筆出價後這麼多秒（0 為不延長）
+    min-raise-percent: 5 # 每次最少加價，為起標價的百分比（無條件進位，至少 1）
 
 pricing:
   # 購地基礎價格；優待與稅務不在此處，由區域／稅務 provider 提供倍率。
