@@ -55,7 +55,13 @@ public final class SelectionToolListener implements Listener {
         event.setCancelled();var block=event.getBlock();
         capture(event.getPlayer(),new Point(block.getLevel().getFolderName(),block.getFloorX(),block.getFloorY(),block.getFloorZ()),true);
     }
+    /** The game sends one right-click on a block twice in a row; the second one is the same click and is ignored. */
+    private record Click(Point point,boolean first,long at){}
+    private final Map<UUID,Click> lastClick=new java.util.concurrent.ConcurrentHashMap<>();
+    private static final long SAME_CLICK_MILLIS=400;
     private void capture(Player player,Point point,boolean first){
+        long now=System.currentTimeMillis();Click before=lastClick.put(player.getUniqueId(),new Click(point,first,now));
+        if(before!=null&&before.first()==first&&before.point().equals(point)&&now-before.at()<SAME_CLICK_MILLIS)return;
         try{
             boolean ignoreHeight=plugin.trading().ignoreHeight(player,point);Selection previous=selections.get(player.getUniqueId());
             Point other=previous==null?null:first?previous.second():previous.first();
@@ -83,7 +89,7 @@ public final class SelectionToolListener implements Listener {
     }
     public void forget(UUID player,Selection expected){selections.remove(player,expected);}
 
-    @EventHandler public void onQuit(PlayerQuitEvent event){forget(event.getPlayer().getUniqueId());}
+    @EventHandler public void onQuit(PlayerQuitEvent event){forget(event.getPlayer().getUniqueId());lastClick.remove(event.getPlayer().getUniqueId());}
 
     public Selection get(UUID playerId){return selections.get(playerId);}
     public void forget(UUID playerId){selections.remove(playerId);}
