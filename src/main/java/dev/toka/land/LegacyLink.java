@@ -18,10 +18,22 @@ import java.lang.reflect.Method;
 final class LegacyLink implements Listener {
     private final Main plugin;
     private boolean listening;
+    private final LegacyBatch batch;
     /** Apart from this class, so that removing the event handler leaves the plugin-enable handler alone. */
     private final Listener announcements = new Listener() { };
 
-    LegacyLink(Main plugin) { this.plugin = plugin; }
+    LegacyLink(Main plugin) {
+        this.plugin = plugin;
+        this.batch = new LegacyBatch(resolved -> plugin.lands().replaceLegacyNames(resolved),
+                flush -> plugin.getServer().getScheduler().scheduleDelayedTask(plugin, flush, delayTicks()),
+                (count, failure) -> {
+                    if (failure != null) plugin.texts().warn("log.legacyFailed", failure.getCause() != null ? failure.getCause() : failure);
+                    else if (count != null && count > 0) plugin.texts().info("log.legacyReplaced", count);
+                });
+    }
+
+    /** How long takeovers are gathered before one pass applies them all (1..1200 ticks). */
+    private int delayTicks() { return Math.max(1, Math.min(1200, plugin.getConfig().getInt("legacy.batch-delay-ticks", 40))); }
 
     /** What has been announced so far, then everything announced later. */
     void connect() {
@@ -46,13 +58,7 @@ final class LegacyLink implements Listener {
         }
     }
 
-    private void replace(Map<String, UUID> resolved) {
-        if (resolved.isEmpty()) return;
-        plugin.lands().replaceLegacyNames(resolved).whenComplete((count, failure) -> {
-            if (failure != null) plugin.texts().warn("log.legacyFailed", failure.getCause());
-            else if (count > 0) plugin.texts().info("log.legacyReplaced", count);
-        });
-    }
+    private void replace(Map<String, UUID> resolved) { batch.add(resolved); }
 
     /** Stops listening; called when the plugin is disabled. */
     void disconnect() {

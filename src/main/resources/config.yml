@@ -87,3 +87,6 @@ pricing:
   provider-lost-grace-seconds: 300
   # 刪除領地時退還基礎價格的比例，只退給建立者。
   refund-rate: 0.7
+legacy:
+  # tokaProfiles 接手舊名稱後，先等這麼多 tick（20 tick = 1 秒）把同時到來的接手合併，再用一次寫入一併換成帳號；範圍 1～1200。
+  batch-delay-ticks: 40
