@@ -7,7 +7,6 @@ import dev.toka.land.model.ClaimAccess;
 import dev.toka.land.model.ClaimKind;
 import dev.toka.land.model.LandClaim;
 import dev.toka.land.protection.SelectionToolListener;
-import java.util.HashMap;
 import java.util.Map;
 
 /** Player-facing text: language choice, message lookup and owner labels. Authorization never uses these names. */

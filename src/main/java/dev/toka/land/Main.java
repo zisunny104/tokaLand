@@ -66,7 +66,7 @@ public final class Main extends PluginBase {
             if (!directory.startsWith(pluginDirectory)) throw new IllegalArgumentException("storage.directory must remain inside the plugin data folder");
             store = DocumentStore.open(new StoreConfig(backend, directory, config.getInt("storage.schema-version", 1)));
             lands = new LandService(new DatasetRepository(store));
-            // The cutover tool flips ownership.active only after the previous manager is disabled; Land never probes other plugins.
+            // ownership.active is switched on by hand only after the previous manager is disabled; Land never probes other plugins.
             ownership = config.getBoolean("ownership.active", false);
 
             providers = new Providers(this);
@@ -185,23 +185,6 @@ public final class Main extends PluginBase {
     public static Main instance() { return instance; }
     public boolean isReady() { return ready && lands != null && lands.healthy(); }
     /** True only when Land is healthy and has taken over protection. */
-    /**
-     * For the cutover tool, by reflection: Land takes over claim protection now and keeps doing so after a restart. Only the
-     * tool calls it, and only after the previous manager is switched off, so two managers never act together.
-     */
-    public static void activateOwnership() throws java.io.IOException { setOwnership(true); }
-
-    /** Undoes {@link #activateOwnership()}, for when the cutover has to be taken back. */
-    public static void deactivateOwnership() throws java.io.IOException { setOwnership(false); }
-
-    private static synchronized void setOwnership(boolean on) throws java.io.IOException {
-        Main main = instance;
-        if (main == null || !main.isReady()) throw new IllegalStateException("Land unavailable");
-        ConfigEdit.setBoolean(main.getDataFolder().toPath().resolve("config.yml"), "ownership", "active", on);
-        main.getConfig().set("ownership.active", on);
-        main.ownership = on;
-    }
-
     public static boolean ownsLand() { return instance != null && instance.isReady() && instance.ownership; }
     public boolean maintenanceLocked() { return maintenanceLocked; }
     public Providers providers() { return providers; }
@@ -264,6 +247,7 @@ public final class Main extends PluginBase {
         return TeleportQueries.display(main.index(), idOrName);
     }
 
+    // API: other plugins register their callbacks here
     /** See {@link Providers}: callbacks and JSON keep Land model classes out of other plugins' loaders. */
     public static void registerProtectedAuthority(String providerName, BiPredicate<Player, String> callback) { available().providers.registerAuthority(providerName, callback); }
     public static void unregisterProtectedAuthority(String providerName) { Main main = instance; if (main != null) { main.requirePrimaryThread(); main.providers.unregisterAuthority(providerName); } }
@@ -273,6 +257,7 @@ public final class Main extends PluginBase {
     public static void registerPurchasePolicy(String pluginName, BiFunction<Player, String, String> callback) { available().providers.registerPricing(pluginName, callback); }
     public static void unregisterPurchasePolicy(String pluginName) { if (instance != null && instance.providers != null) instance.providers.unregisterPricing(pluginName); }
 
+    // API: trusted plugins (administration)
     /** Trusted plugin administration API; a maintenance lock always defeats player privileges. */
     public static void setMaintenanceLocked(boolean locked) {
         Main main = instance;
@@ -319,17 +304,5 @@ public final class Main extends PluginBase {
     public static boolean ownsAnyClaim(UUID player) {
         Main main = instance;
         return main != null && main.isReady() && !main.index().ownedBy(player).isEmpty();
-    }
-
-    public static String exportDatasetJson() {
-        Main main = instance;
-        if (main == null || !main.isReady()) throw new IllegalStateException("Land unavailable");
-        return main.dataset.export();
-    }
-
-    public static CompletableFuture<String> replaceDatasetJson(String expectedRevision, String json) {
-        Main main = instance;
-        if (main == null || !main.isReady()) throw new IllegalStateException("Land unavailable");
-        return main.dataset.replace(expectedRevision, json);
     }
 }

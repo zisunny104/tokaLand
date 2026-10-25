@@ -3,7 +3,6 @@ package dev.toka.land.lease;
 import cn.nukkit.Player;
 import cn.nukkit.command.CommandSender;
 import dev.toka.land.Main;
-import dev.toka.land.model.LandClaim;
 import dev.toka.land.purchase.PurchaseCoordinator;
 import java.io.IOException;
 import java.util.ArrayList;

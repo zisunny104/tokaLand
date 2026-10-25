@@ -22,6 +22,7 @@ public abstract class PlayerClaimEvent extends PlayerEvent {
         this.at = at;
     }
 
+    // API: getters read by other plugins' listeners (plain values, no Land classes)
     public UUID getClaimId() { return claimId; }
     public String getClaimName() { return claimName; }
     /** PLAYER, PUBLIC or FACILITY. */
