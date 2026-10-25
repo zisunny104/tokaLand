@@ -105,6 +105,7 @@ window:
     LEASED: "租用中"
     GRACE: "欠租寬限"
     AUCTION: "拍賣中"
+  next: "下一頁"
   prev: "上一頁"
   back: "返回"
   close: "§c關閉"

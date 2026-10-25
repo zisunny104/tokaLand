@@ -105,6 +105,7 @@ window:
     LEASED: "let"
     GRACE: "behind on rent"
     AUCTION: "in auction"
+  next: "Next"
   prev: "Previous"
   back: "Back"
   close: "§cClose"
