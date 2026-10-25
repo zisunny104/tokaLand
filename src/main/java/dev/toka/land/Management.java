@@ -1,7 +1,9 @@
 package dev.toka.land;
 
 import cn.nukkit.Player;
+import dev.toka.land.model.AccessSubject;
 import dev.toka.land.model.ClaimAccess;
+import dev.toka.land.model.MemberLevel;
 import dev.toka.land.model.ClaimKind;
 import dev.toka.land.model.ClaimPermission;
 import dev.toka.land.model.LandClaim;
@@ -55,6 +57,23 @@ public final class Management implements cn.nukkit.event.Listener {
     public CompletableFuture<String> edit(Player player, LandClaim before, LandClaim after) {
         check(player, before);
         return lands.edit(before, after);
+    }
+
+    /**
+     * A member gives up their own place in a claim. This needs no right to manage, only a grant of the player's own on this claim;
+     * the owner and a tenant cannot leave, and a right that comes from a parent claim is given up there.
+     */
+    public CompletableFuture<String> leave(Player player, LandClaim claim) {
+        plugin.requirePrimaryThread();
+        if (!Main.ownsLand() || plugin.maintenanceLocked()) throw new IllegalStateException("LAND_NOT_ACTIVE");
+        if (trading.hasPending(claim.id())) throw new IllegalStateException("TRANSACTION_RECOVERY_PENDING");
+        LandClaim current = plugin.getClaim(claim.id()).orElseThrow(() -> new IllegalStateException("CLAIM_NOT_FOUND"));
+        UUID me = player.getUniqueId();
+        if (ClaimAccess.effectiveOwner(plugin.index(), current.id()).filter(me::equals).isPresent()) throw new IllegalStateException("LEAVE_OWNER");
+        AccessSubject self = AccessSubject.player(me);
+        if (MemberLevel.of(current, self) == null)
+            throw new IllegalStateException(ClaimAccess.isMember(plugin.index(), current.id(), me) ? "LEAVE_VIA_PARENT" : "NOT_MEMBER");
+        return lands.edit(current, ClaimEdits.member(current, self, (MemberLevel) null));
     }
 
     @cn.nukkit.event.EventHandler public void onQuit(cn.nukkit.event.player.PlayerQuitEvent event) {

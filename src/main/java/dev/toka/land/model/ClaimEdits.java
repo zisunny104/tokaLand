@@ -25,13 +25,17 @@ public final class ClaimEdits {
     public static LandClaim teleport(LandClaim c,ClaimDetails.TeleportPoint point){
         return copy(c,c.name(),c.type(),c.ownerId(),c.ownerNameSnapshot(),c.accessGrants(),c.details().withTeleport(point));
     }
-    public static LandClaim member(LandClaim c,AccessSubject subject,boolean add){
-        if(add&&subject.type()!=AccessSubject.Type.PLAYER_UUID)throw new IllegalArgumentException("MEMBER_IDENTITY_UNCONFIRMED");
-        Set<ClaimPermission> permissions=EnumSet.of(ClaimPermission.BUILD,ClaimPermission.INTERACT,ClaimPermission.CONTAINERS);
+    public static LandClaim member(LandClaim c,AccessSubject subject,boolean add){ return member(c,subject,add?MemberLevel.MEMBER:null); }
+    /** Replaces the subject's member grants by the level's; a null level removes the subject. */
+    public static LandClaim member(LandClaim c,AccessSubject subject,MemberLevel level){
+        if(level!=null&&subject.type()!=AccessSubject.Type.PLAYER_UUID)throw new IllegalArgumentException("MEMBER_IDENTITY_UNCONFIRMED");
         List<AccessGrant> grants=new ArrayList<>(c.accessGrants().stream()
-                .filter(g->!g.subject().equals(subject)||!permissions.contains(g.permission())).toList());
-        if(add)for(ClaimPermission action:permissions)grants.add(new AccessGrant(subject,action,AccessDecision.ALLOW));
+                .filter(g->!g.subject().equals(subject)||!MemberLevel.MANAGED.contains(g.permission())).toList());
+        if(level!=null)for(ClaimPermission action:level.permissions())grants.add(new AccessGrant(subject,action,AccessDecision.ALLOW));
         return copy(c,c.name(),c.type(),c.ownerId(),c.ownerNameSnapshot(),grants,c.details());
+    }
+    public static LandClaim teleportAccess(LandClaim c,TeleportAccess access){
+        return copy(c,c.name(),c.type(),c.ownerId(),c.ownerNameSnapshot(),c.accessGrants(),c.details().withTeleportAccess(access));
     }
     public static LandClaim addSelection(LandClaim c,LandSelection part){
         List<LandSelection> parts=new ArrayList<>(c.selections());parts.add(part);

@@ -10,6 +10,10 @@ import dev.toka.land.model.ClaimEdits;
 import dev.toka.land.model.ClaimTargets;
 import dev.toka.land.model.AccessSubject;
 import dev.toka.land.model.AccessPolicy;
+import dev.toka.land.model.ClaimAccess;
+import dev.toka.land.model.ClaimKind;
+import dev.toka.land.model.MemberLevel;
+import dev.toka.land.model.TeleportAccess;
 import java.util.*;
 
 /** Legacy user commands are enabled only after verified ownership; inspection remains available in standby. */
@@ -23,7 +27,7 @@ public final class LandCommand extends Command {
         this.tools=new ClaimTools(plugin);
         this.help=new HelpPages("land",List.of(
             new HelpPages.Section("basics","tokaland.use",false,List.of("menu","info","list","select","set","tpl","rename","del")),
-            new HelpPages.Section("manage","tokaland.use",true,List.of("give","type","group","note")),
+            new HelpPages.Section("manage","tokaland.use",true,List.of("give","type","group","leave","tpaccess","note")),
             new HelpPages.Section("sub","tokaland.use",true,List.of("sub","leaseMenu","leaseOffer","leaseSet","leaseCancel","leaseRent","leaseRelease","leaseInfo","leaseList")),
             new HelpPages.Section("auction","tokaland.use",true,List.of("auctionMenu","auctionStart","auctionBid","auctionCancel","auctionList","auctionInfo")),
             new HelpPages.Section("admin","tokaland.admin",true,List.of("grant","refund","reset","clear","reload","fac","facHelp")),
@@ -38,8 +42,11 @@ public final class LandCommand extends Command {
         addCommandParameters("tpl",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandTplAction",new String[]{"tpl"})),CommandParameter.newType("claim",true,CommandParamType.STRING)});
         for(String action:List.of("rename","give","type"))addCommandParameters(action,new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLand"+action,new String[]{action})),
             action.equals("type")?CommandParameter.newEnum("value",new CommandEnum("TokaLandType",new String[]{"land","pvp"})):CommandParameter.newType("value",CommandParamType.STRING),CommandParameter.newType("claim",true,CommandParamType.STRING)});
-        addCommandParameters("groupEdit",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandGroup",new String[]{"group"})),CommandParameter.newEnum("mode",new CommandEnum("TokaLandGroupEdit",new String[]{"add","del"})),CommandParameter.newType("player",CommandParamType.STRING),CommandParameter.newType("claim",true,CommandParamType.STRING)});
+        addCommandParameters("groupEdit",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandGroup",new String[]{"group"})),CommandParameter.newEnum("mode",new CommandEnum("TokaLandGroupEdit",new String[]{"add","visitor","del"})),CommandParameter.newType("player",CommandParamType.STRING),CommandParameter.newType("claim",true,CommandParamType.STRING)});
         addCommandParameters("groupList",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandGroupListAction",new String[]{"group"})),CommandParameter.newEnum("mode",new CommandEnum("TokaLandGroupList",new String[]{"list"})),CommandParameter.newType("claim",true,CommandParamType.STRING)});
+        addCommandParameters("leave",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandLeaveAction",new String[]{"leave"})),CommandParameter.newType("claim",CommandParamType.STRING)});
+        addCommandParameters("tpaccess",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandTpAccessAction",new String[]{"tpaccess"})),CommandParameter.newType("claim",CommandParamType.STRING),
+            CommandParameter.newEnum("who",new CommandEnum("TokaLandTpAccessWho",new String[]{"owner","member","all"}))});
         addCommandParameters("del",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandDeleteAction",new String[]{"del"})),CommandParameter.newType("claim",true,CommandParamType.STRING),
             CommandParameter.newEnum("refund",true,new CommandEnum("TokaLandDeleteRefund",new String[]{"norefund"}))});
         addCommandParameters("facHelp",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandFacilityHelpAction",new String[]{"fac"})),CommandParameter.newEnum("what",new CommandEnum("TokaLandFacilityHelp",new String[]{"help"}))});
@@ -101,6 +108,19 @@ public final class LandCommand extends Command {
         addCommandParameters("auctionList",new CommandParameter[]{CommandParameter.newEnum("action",word),sub.apply("list"),CommandParameter.newType("page",true,CommandParamType.INT)});
         addCommandParameters("auctionInfo",new CommandParameter[]{CommandParameter.newEnum("action",word),sub.apply("info"),CommandParameter.newType("idOrName",CommandParamType.STRING)});
     }
+    /** The claims the player is a member of are offered after "leave"; the free-text overload stays for names the client cannot list. */
+    @Override public CommandDataVersions generateCustomCommandData(Player player){
+        var data=super.generateCustomCommandData(player);
+        if(data==null||!plugin.isReady())return data;
+        var names=plugin.index().memberOf(player.getUniqueId()).stream().map(LandClaim::name).filter(name->name.equals(name.toLowerCase(Locale.ROOT))).distinct().sorted().toList();
+        if(names.isEmpty())return data;
+        for(CommandData version:data.versions){
+            var overload=new CommandOverload();
+            overload.input.parameters=new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandLeaveAction",new String[]{"leave"})),CommandParameter.newEnum("claim",new CommandEnum("TokaLandMemberClaims",names))};
+            version.overloads.put("leaveMember",overload);
+        }
+        return data;
+    }
     @Override public boolean execute(CommandSender sender,String label,String[] args) {
         if(!testPermissionSilent(sender)){send(sender,"command.denied");return true;}
         String action=args.length==0?"help":args[0].toLowerCase(Locale.ROOT);
@@ -112,6 +132,8 @@ public final class LandCommand extends Command {
         if(!plugin.isReady()){send(sender,"ui.unavailable","Land");return true;}
         if(Set.of("rename","give","type","group","grp","del").contains(action)
                 ||action.equals("tpl")&&sender instanceof Player p&&(args.length>1||!plugin.management().claimsAround(p).isEmpty()))return manage(sender,action,args);
+        if(action.equals("leave"))return leave(sender,args);
+        if(action.equals("tpaccess"))return tpAccess(sender,args);
         if(action.equals("sub")||action.equals("lease"))return plugin.leases().command(sender,args);
         if(action.equals("auction"))return plugin.auctions().command(sender,args);
         if(action.equals("fac")||action.equals("facility"))return facilityCommand(sender,args);
@@ -283,6 +305,65 @@ public final class LandCommand extends Command {
         }catch(IllegalStateException failure){send(sender,"purchase.unavailable",failure.getMessage());}
         return true;
     }
+    /** Whether the query names a claim the player owns (or rents); only then "leave" is answered with the owner message. */
+    private boolean owns(UUID player,String query){
+        try{ClaimTargets.resolve(plugin.index().ownedBy(player),query);return true;}catch(IllegalArgumentException none){return false;}
+    }
+    private boolean leave(CommandSender sender,String[] args){
+        if(!(sender instanceof Player player)||!sender.hasPermission("tokaland.use")){send(sender,"command.denied");return true;}
+        if(args.length!=2){send(sender,"command.usage");return true;}
+        UUID me=player.getUniqueId();
+        try{
+            if(owns(me,args[1])){send(sender,"leave.owner");return true;}
+            LandClaim claim=ClaimTargets.resolve(plugin.index().memberOf(me),args[1]);
+            plugin.management().leave(player,claim).whenComplete((revision,error)->plugin.getServer().getScheduler().scheduleTask(plugin,()->{
+                if(error!=null){leaveFailed(sender,rootMessage(error));return;}
+                send(sender,"leave.done",claim.name());
+                player.sendCommandData();
+                ClaimAccess.effectiveOwner(plugin.index(),claim.id()).flatMap(id->plugin.getServer().getPlayer(id))
+                        .ifPresent(owner->owner.sendMessage(plugin.texts().text(owner,"leave.ownerTold",player.getName(),claim.name())));
+            }));
+        }catch(ClaimTargets.Ambiguous ambiguous){
+            send(sender,"management.ambiguous");for(var match:ambiguous.matches())send(sender,"management.target",match.name(),match.id());
+        }catch(RuntimeException failure){leaveFailed(sender,String.valueOf(failure.getMessage()));}
+        return true;
+    }
+    private void leaveFailed(CommandSender sender,String code){
+        switch(code){
+            case "LEAVE_OWNER" -> send(sender,"leave.owner");
+            case "LEAVE_VIA_PARENT" -> send(sender,"leave.viaParent");
+            case "NOT_MEMBER","CLAIM_NOT_FOUND" -> send(sender,"leave.notMember");
+            default -> send(sender,"purchase.unavailable",code);
+        }
+    }
+    /** /land tpaccess &lt;claim&gt; owner|member|all: the claim's owner (or an administrator) chooses who may use its teleport point. */
+    private boolean tpAccess(CommandSender sender,String[] args){
+        if(!(sender instanceof Player player)||!sender.hasPermission("tokaland.use")){send(sender,"command.denied");return true;}
+        var access=args.length==3?TeleportAccess.parse(args[2]):Optional.<TeleportAccess>empty();
+        if(access.isEmpty()){send(sender,"command.usage");return true;}
+        try{
+            // The claims under the player's feet, like the other editing commands, and the ones they own, so the window can name any of them.
+            Map<UUID,LandClaim> candidates=new LinkedHashMap<>();
+            plugin.management().claimsAround(player).forEach(claim->candidates.put(claim.id(),claim));
+            plugin.index().ownedBy(player.getUniqueId()).stream().filter(claim->claim.kind()==ClaimKind.PLAYER).forEach(claim->candidates.putIfAbsent(claim.id(),claim));
+            LandClaim before=ClaimTargets.resolve(candidates.values(),args[1]);
+            plugin.management().check(player,before);
+            plugin.management().edit(player,before,ClaimEdits.teleportAccess(before,access.get())).whenComplete((revision,error)->plugin.getServer().getScheduler().scheduleTask(plugin,()->{
+                if(error==null)send(sender,"tpaccess.done",before.name(),plugin.texts().text(sender,"window.tpaccess."+access.get().name()));
+                else send(sender,"purchase.unavailable",rootMessage(error));
+            }));
+        }catch(ClaimTargets.Ambiguous ambiguous){
+            send(sender,"management.ambiguous");for(var match:ambiguous.matches())send(sender,"management.target",match.name(),match.id());
+        }catch(RuntimeException failure){send(sender,"purchase.unavailable",failure.getMessage());}
+        return true;
+    }
+    /** Tells an added member in chat, if online; nothing is stored for a player who is away. */
+    private void tellAdded(Player adder,LandClaim claim,UUID who,MemberLevel level){
+        plugin.getServer().getPlayer(who).ifPresent(target->{
+            target.sendMessage(plugin.texts().text(target,"management.added",claim.displayName(plugin.texts().language(target)),adder.getName(),plugin.texts().text(target,"window.level."+level.name()),claim.name()));
+            target.sendCommandData();
+        });
+    }
     private void send(CommandSender sender,String key,Object...args){sender.sendMessage(plugin.texts().text(sender,key,args));}
     private boolean manage(CommandSender sender,String action,String[] given){
         if(!(sender instanceof Player player)||!sender.hasPermission("tokaland.use")){send(sender,"command.denied");return true;}
@@ -305,6 +386,7 @@ public final class LandCommand extends Command {
                 }));send(sender,"management.saleStarted");return true;
             }
             LandClaim after;
+            UUID notify=null;MemberLevel notifyLevel=null;
             switch(action){
                 case "rename" -> after=ClaimEdits.rename(before,args[1]);
                 case "give" -> {UUID person=plugin.management().resolvePlayer(args[1]);after=ClaimEdits.owner(before,person,plugin.management().playerName(person));}
@@ -314,21 +396,25 @@ public final class LandCommand extends Command {
                     String mode=args[1].toLowerCase(Locale.ROOT);
                     if(mode.equals("list")){
                         send(sender,"management.groupHeader",before.id(),before.name());
-                        before.accessGrants().stream().map(g->g.subject()).distinct().forEach(subject->send(sender,"management.member",subject.type(),subject.type()==AccessSubject.Type.PLAYER_UUID?plugin.management().playerName(UUID.fromString(subject.id())):subject.id(),subject.id()));
+                        before.accessGrants().stream().map(g->g.subject()).distinct().forEach(subject->send(sender,"management.member",subject.type(),subject.type()==AccessSubject.Type.PLAYER_UUID?plugin.management().playerName(UUID.fromString(subject.id())):subject.id(),subject.id(),
+                            subject.type()==AccessSubject.Type.PLAYER_UUID&&MemberLevel.of(before,subject)!=null?plugin.texts().text(sender,"window.level."+MemberLevel.of(before,subject).name()):""));
                         return true;
                     }
-                    if(!Set.of("add","del").contains(mode))throw new IllegalArgumentException("INVALID_GROUP_ACTION");
+                    if(!Set.of("add","visitor","del").contains(mode))throw new IllegalArgumentException("INVALID_GROUP_ACTION");
                     List<AccessSubject> legacy=before.accessGrants().stream().map(g->g.subject()).filter(s->s.type()==AccessSubject.Type.LEGACY_NAME&&s.id().equalsIgnoreCase(args[2])).distinct().toList();
                     UUID resolved=null;
                     try{resolved=plugin.management().resolvePlayer(args[2]);}catch(IllegalArgumentException unresolved){if(mode.equals("add")||legacy.isEmpty())throw unresolved;}
                     after=before;
-                    if(resolved!=null)after=ClaimEdits.member(after,AccessSubject.player(resolved),mode.equals("add"));
+                    MemberLevel level=mode.equals("add")?MemberLevel.MEMBER:mode.equals("visitor")?MemberLevel.VISITOR:null;
+                    if(resolved!=null)after=ClaimEdits.member(after,AccessSubject.player(resolved),level);
+                    if(resolved!=null&&level!=null&&!resolved.equals(player.getUniqueId())&&MemberLevel.of(before,AccessSubject.player(resolved))!=level){notify=resolved;notifyLevel=level;}
                     if(mode.equals("del"))for(var subject:legacy)after=ClaimEdits.member(after,subject,false);
                 }
                 default -> throw new IllegalArgumentException("UNKNOWN_ACTION");
             }
+            final UUID told=notify;final MemberLevel toldLevel=notifyLevel;
             plugin.management().edit(player,before,after).whenComplete((revision,error)->plugin.getServer().getScheduler().scheduleTask(plugin,()->{
-                if(error==null)send(sender,"management.saved",before.id());
+                if(error==null){send(sender,"management.saved",before.id());if(told!=null)tellAdded(player,before,told,toldLevel);}
                 else {Throwable cause=error;while(cause.getCause()!=null)cause=cause.getCause();send(sender,"purchase.unavailable",cause.getMessage());}
             }));
         }catch(ClaimTargets.Ambiguous ambiguous){

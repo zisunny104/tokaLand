@@ -35,7 +35,7 @@ public class DatasetRepositoryTest {
     }
     @Test public void prototypeFieldsUpgradeToSharedAclAndIndependentLock() {
         var source=claim("old");var old=DatasetRepository.encode(source);
-        old.remove("accessGrants");old.remove("accessPolicy");old.getAsJsonObject("details").remove("refundValue");old.getAsJsonObject("details").remove("refundSource");
+        old.remove("accessGrants");old.remove("accessPolicy");old.getAsJsonObject("details").remove("refundValue");old.getAsJsonObject("details").remove("refundSource");old.getAsJsonObject("details").remove("teleportAccess");
         var overrides=new JsonObject();var member=UUID.randomUUID();var memberActions=new JsonObject();
         memberActions.addProperty("BUILD","ALLOW");overrides.add(member.toString(),memberActions);old.add("accessOverrides",overrides);
         var details=old.getAsJsonObject("details");details.addProperty("protection","LOCK");
@@ -49,7 +49,7 @@ public class DatasetRepositoryTest {
     }
     @Test public void oldManifestLoadsAndKeepsFormatOneOnCommit()throws Exception{
         try(var store=DocumentStore.open(new StoreConfig(Backend.JSON,temporary.newFolder().toPath(),1))){
-            var source=claim("old-manifest");var old=DatasetRepository.encode(source);old.remove("accessGrants");old.remove("accessPolicy");old.getAsJsonObject("details").remove("refundValue");old.getAsJsonObject("details").remove("refundSource");
+            var source=claim("old-manifest");var old=DatasetRepository.encode(source);old.remove("accessGrants");old.remove("accessPolicy");old.getAsJsonObject("details").remove("refundValue");old.getAsJsonObject("details").remove("refundSource");old.getAsJsonObject("details").remove("teleportAccess");
             old.getAsJsonObject("details").addProperty("protection","OPEN");old.getAsJsonObject("details").add("pendingMembers",new com.google.gson.JsonArray());
             String key="c."+source.id()+"."+DatasetRepository.digest(old);store.save(key,old);
             var refs=new JsonObject();refs.addProperty(source.id().toString(),key);

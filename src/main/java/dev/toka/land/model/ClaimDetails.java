@@ -6,20 +6,27 @@ import java.util.*;
 /**
  * @param refundValue what deleting the claim pays back, fixed when it was bought (null: a claim from before this existed)
  * @param refundSource the account that paid for it and pays the refund; null when nothing holds the money
+ * @param teleportAccess who may use the teleport point, a {@link TeleportAccess} name; null: what the claim always had (see {@link TeleportAccess#of})
  */
 public record ClaimDetails(UUID creatorId, String creatorName, TeleportPoint teleport, boolean publicTeleport,
-                           Long refundValue, UUID refundSource) {
+                           Long refundValue, UUID refundSource, String teleportAccess) {
     public ClaimDetails(UUID creatorId, String creatorName, TeleportPoint teleport, boolean publicTeleport) {
-        this(creatorId, creatorName, teleport, publicTeleport, null, null);
+        this(creatorId, creatorName, teleport, publicTeleport, null, null, null);
+    }
+    public ClaimDetails(UUID creatorId, String creatorName, TeleportPoint teleport, boolean publicTeleport, Long refundValue, UUID refundSource) {
+        this(creatorId, creatorName, teleport, publicTeleport, refundValue, refundSource, null);
     }
     public ClaimDetails {
         if (refundValue != null && refundValue < 0) throw new IllegalArgumentException("refundValue must not be negative");
     }
     public ClaimDetails withRefundValue(long value) {
-        return new ClaimDetails(creatorId, creatorName, teleport, publicTeleport, value, refundSource);
+        return new ClaimDetails(creatorId, creatorName, teleport, publicTeleport, value, refundSource, teleportAccess);
     }
     public ClaimDetails withTeleport(TeleportPoint point) {
-        return new ClaimDetails(creatorId, creatorName, point, publicTeleport, refundValue, refundSource);
+        return new ClaimDetails(creatorId, creatorName, point, publicTeleport, refundValue, refundSource, teleportAccess);
+    }
+    public ClaimDetails withTeleportAccess(TeleportAccess access) {
+        return new ClaimDetails(creatorId, creatorName, teleport, publicTeleport, refundValue, refundSource, access.name());
     }
 
     public record TeleportPoint(String world, double x, double y, double z, float yaw, float pitch) {

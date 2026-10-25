@@ -21,6 +21,7 @@ import dev.toka.land.lease.LeaseInput;
 import dev.toka.land.model.ClaimAccess;
 import dev.toka.land.model.ClaimKind;
 import dev.toka.land.model.LandClaim;
+import dev.toka.land.model.TeleportAccess;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.IntConsumer;
@@ -131,9 +132,14 @@ public final class LandWindow implements Listener {
             UUID id = UUID.fromString(held.claimId);
             var found = plugin.getClaim(id);
             if (found.isEmpty() || ownedIds.contains(id) || !LeaseInput.matches(query, found.get().name(), held.claimId)) continue;
+            ownedIds.add(id);
             rows.add(new Row(found.get().name() + " §8(" + text(player, "window.rented") + " " + stateText(player, held) + ")", icon(found.get(), true),
                     () -> detail(player, id, page, query)));
         }
+        // Claims where the player is only a member, from the index's member map (no scan of every claim).
+        plugin.index().memberOf(me).stream().filter(claim -> !ownedIds.contains(claim.id()) && LeaseInput.matches(query, claim.name(), claim.id().toString()))
+                .sorted(Comparator.comparing(LandClaim::name, String.CASE_INSENSITIVE_ORDER))
+                .forEach(claim -> rows.add(new Row(claim.name() + " §8(" + text(player, "window.memberTag") + ")", icon(claim, false), () -> detail(player, claim.id(), page, query))));
         List<Row> fixed = List.of(
                 new Row(text(player, "window.search"), "textures/ui/magnifyingGlass", () -> searchForm(player, query, q -> list(player, 0, q))),
                 new Row(text(player, "window.leaseMenu"), "textures/items/emerald", () -> lease.menu(player)),
@@ -153,15 +159,26 @@ public final class LandWindow implements Listener {
         boolean mine = ClaimAccess.effectiveOwner(plugin.index(), id).filter(player.getUniqueId()::equals).isPresent();
         Lease held = plugin.leases().leaseOf(id);
         boolean tenant = held != null && player.getUniqueId().toString().equals(held.tenant);
+        boolean member = !mine && !tenant && ClaimAccess.isMember(plugin.index(), id, player.getUniqueId());
+        if (!mine && !tenant && !member) { list(player, page, query); return; }
         Runnable back = () -> list(player, page, query);
         var menu = menu(player, claim.displayName(language), plugin.texts().claimInfo(claim, language));
         menu.button(text(player, "window.back"), null, back);
-        // The way there is tokaPortal's, and only a claim with a teleport point can be gone to.
-        if (claim.details().teleport() != null && portal() != null) menu.button(text(player, "window.teleport"), "textures/items/ender_pearl", () -> goTo(player, claim));
+        // The way there is tokaPortal's, and only a claim with a teleport point that this player may use can be gone to.
+        if (portal() != null && mayGo(player, claim)) menu.button(text(player, "window.teleport"), "textures/items/ender_pearl", () -> goTo(player, claim));
+        if (member) {
+            menu.button(text(player, "window.leave"), "textures/ui/door_iron", () -> confirm(player, text(player, "window.leave"),
+                    text(player, "window.leaveText", claim.name()), () -> run(player, "land leave " + id)));
+            menu.button(text(player, "window.close"), null, () -> { });
+            menu.show();
+            return;
+        }
         if (mine) {
             menu.button(text(player, "window.showBounds"), "textures/ui/world_glyph_color", () -> showBounds(player, claim));
             menu.button(text(player, "window.rename"), "textures/items/name_tag", () -> renameForm(player, claim));
             menu.button(text(player, "window.members"), "textures/ui/FriendsIcon", () -> membersForm(player, claim));
+            if (claim.details().teleport() != null) menu.button(text(player, "window.tpaccessButton", text(player, "window.tpaccess." + TeleportAccess.of(claim.details()).name())),
+                    "textures/items/ender_eye", () -> tpAccessForm(player, claim));
             menu.button(text(player, "window.createSub"), "textures/items/map_filled", () -> lease.subForm(player));
             if (claim.parentClaimId() != null) menu.button(text(player, "window.offer"), "textures/items/emerald", () -> lease.offerForm(player, id));
             if (claim.parentClaimId() != null) menu.button(text(player, "aw.start"), "textures/items/gold_nugget", () -> auction.startForm(player, id));
@@ -193,16 +210,39 @@ public final class LandWindow implements Listener {
     private void membersForm(Player player, LandClaim claim) {
         var window = new FormWindowCustom(text(player, "window.members"));
         window.addElement(new ElementHeader(text(player, "window.members")));
-        window.addElement(new ElementDropdown(text(player, "window.memberMode"),
-                List.of(text(player, "window.memberAdd"), text(player, "window.memberDel"), text(player, "window.memberList"))));
+        window.addElement(new ElementDropdown(text(player, "window.memberMode"), List.of(text(player, "window.memberAdd"),
+                text(player, "window.memberAddVisitor"), text(player, "window.memberDel"), text(player, "window.memberList"))));
         window.addElement(new ElementInput(text(player, "window.memberName"), "", ""));
         custom(player, window, response -> {
-            int mode = response.getDropdownResponse(1).getElementID();
+            var choice = response.getDropdownResponse(1);
+            int mode = choice == null ? -1 : choice.getElementID();
+            if (mode < 0 || mode > 3) return;
             String who = response.getInputResponse(2) == null ? "" : response.getInputResponse(2).strip();
-            if (mode == 2) { run(player, "land group list " + claim.id()); return; }
+            if (mode == 3) { run(player, "land group list " + claim.id()); return; }
             if (!LeaseInput.commandSafe(who)) { player.sendMessage(text(player, "window.badName")); membersForm(player, claim); return; }
-            run(player, "land group " + (mode == 0 ? "add " : "del ") + who + " " + claim.id());
+            run(player, "land group " + (mode == 0 ? "add " : mode == 1 ? "visitor " : "del ") + who + " " + claim.id());
         });
+    }
+
+    /** Who may use the claim's teleport point; the command does the checking. */
+    private void tpAccessForm(Player player, LandClaim claim) {
+        TeleportAccess[] all = TeleportAccess.values();
+        var window = new FormWindowCustom(text(player, "window.tpaccessTitle"));
+        window.addElement(new ElementHeader(text(player, "window.tpaccessTitle")));
+        window.addElement(new ElementDropdown(text(player, "window.tpaccessWho"),
+                Arrays.stream(all).map(access -> text(player, "window.tpaccess." + access.name())).toList(), TeleportAccess.of(claim.details()).ordinal()));
+        custom(player, window, response -> {
+            var choice = response.getDropdownResponse(1);
+            int index = choice == null ? -1 : choice.getElementID();
+            if (index < 0 || index >= all.length) return;
+            run(player, "land tpaccess " + claim.id() + " " + all[index].word());
+        });
+    }
+
+    /** The same rule tokaLand answers other plugins with, so a sign and this button agree. */
+    private boolean mayGo(Player player, LandClaim claim) {
+        return claim.details().teleport() != null
+                && TeleportAccess.permits(plugin.index(), claim, player.getUniqueId(), player.hasPermission("tokaland.admin"));
     }
 
     private java.lang.reflect.Method portal() {
@@ -215,6 +255,7 @@ public final class LandWindow implements Listener {
     private void goTo(Player player, LandClaim claim) {
         var go = portal();
         if (go == null) return;
+        if (plugin.getClaim(claim.id()).filter(current -> mayGo(player, current)).isEmpty()) { player.sendMessage(text(player, "window.teleportFailed")); return; }
         try { go.invoke(null, player, claim.id().toString()); }
         catch (ReflectiveOperationException | LinkageError failed) { player.sendMessage(text(player, "window.teleportFailed")); }
     }

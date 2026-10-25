@@ -9,6 +9,7 @@ public final class LandIndex {
     private final Map<String, Map<Cell, Set<UUID>>> cells = new HashMap<>();
     private final Map<String, Set<UUID>> broadClaims = new HashMap<>();
     private volatile Map<UUID, List<LandClaim>> byOwner;
+    private volatile Map<UUID, List<LandClaim>> byMember;
 
     private record Cell(int x, int z) { }
 
@@ -48,6 +49,23 @@ public final class LandIndex {
             byOwner = map = built;
         }
         return map.getOrDefault(owner, List.of());
+    }
+
+    /**
+     * Claims where the player is an explicit member and not the owner, resolved like {@link ClaimAccess#isMember}. Like the owner map it is
+     * built once per immutable index (which is replaced on every change), so the member list stays right without being maintained.
+     */
+    public List<LandClaim> memberOf(UUID player) {
+        Map<UUID, List<LandClaim>> map = byMember;
+        if (map == null) {
+            Map<UUID, List<LandClaim>> built = new HashMap<>();
+            for (LandClaim claim : claims.values())
+                for (UUID candidate : ClaimAccess.granteeCandidates(this, claim))
+                    if (ClaimAccess.isMember(this, claim.id(), candidate)) built.computeIfAbsent(candidate, k -> new ArrayList<>()).add(claim);
+            built.replaceAll((k, v) -> List.copyOf(v));
+            byMember = map = built;
+        }
+        return map.getOrDefault(player, List.of());
     }
 
     public Optional<LandClaim> get(UUID id) { return Optional.ofNullable(claims.get(id)); }

@@ -29,9 +29,9 @@ final class TeleportQueries {
     static String target(LandIndex index, Player player, String idOrName) {
         if (player == null || !player.isOnline() || idOrName == null || idOrName.isBlank())
             return reply("INVALID_REQUEST", new JsonArray());
+        boolean admin = player.hasPermission("tokaland.admin");
         List<LandClaim> usable = index.all().stream().filter(TeleportQueries::hasTarget)
-                .filter(claim -> claim.details().publicTeleport()
-                        || ClaimAccess.allows(index, claim.id(), player.getUniqueId(), ClaimPermission.INTERACT, false))
+                .filter(claim -> TeleportAccess.permits(index, claim, player.getUniqueId(), admin))
                 .toList();
         Lookup found = find(index, usable, idOrName.strip());
         if (found.claim == null) {

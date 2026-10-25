@@ -17,6 +17,26 @@ public final class ClaimAccess {
         return Optional.empty();
     }
 
+    /** An explicit member: allowed to interact through the claim's own grants or an inherited parent's, and not the owner. */
+    public static boolean isMember(LandIndex index, UUID claimId, UUID subject) {
+        return !effectiveOwner(index, claimId).filter(subject::equals).isPresent()
+                && allows(index, claimId, subject, ClaimPermission.INTERACT, false);
+    }
+
+    /** Players with an explicit allow to interact in the claim or in the parents it inherits from: candidates for membership. */
+    static Set<UUID> granteeCandidates(LandIndex index, LandClaim claim) {
+        Set<UUID> found = new HashSet<>(), visited = new HashSet<>();
+        LandClaim current = claim;
+        while (current != null && visited.add(current.id())) {
+            for (AccessGrant grant : current.accessGrants())
+                if (grant.subject().type() == AccessSubject.Type.PLAYER_UUID && grant.permission() == ClaimPermission.INTERACT
+                        && grant.decision() == AccessDecision.ALLOW) found.add(UUID.fromString(grant.subject().id()));
+            if (!current.inheritPermissions() || current.parentClaimId() == null) break;
+            current = index.get(current.parentClaimId()).orElse(null);
+        }
+        return found;
+    }
+
     public static boolean allows(LandIndex index, UUID claimId, UUID subject,
                                  ClaimPermission permission, boolean fallback) {
         Objects.requireNonNull(subject, "subject");
