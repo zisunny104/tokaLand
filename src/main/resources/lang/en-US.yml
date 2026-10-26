@@ -324,7 +324,7 @@ aw:
   none: "No auction is running."
   noneMine: "You have no auctions with bids."
   row: "${0} - ${1} - ${2} left"
-  mineRow: "${0} §8(${1}) ${2}"
+  mineRow: "${0} (${1}) ${2}"
   bid: "Bid"
   bidLabel: "Your bid (at least ${0})"
   cancel: "Cancel auction"

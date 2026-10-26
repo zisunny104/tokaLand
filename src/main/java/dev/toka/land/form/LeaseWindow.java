@@ -138,7 +138,7 @@ final class LeaseWindow {
         plugin.leases().allLeases().stream().filter(lease -> player.getUniqueId().toString().equals(lease.lessor))
                 .filter(lease -> plugin.getClaim(UUID.fromString(lease.claimId)).isPresent())
                 .sorted(Comparator.comparing(this::claimName, String.CASE_INSENSITIVE_ORDER))
-                .forEach(lease -> rows.add(new Row(claimName(lease) + " §8(" + host.stateText(player, lease) + ")", COIN, () -> manage(player, lease.claimId))));
+                .forEach(lease -> rows.add(new Row(claimName(lease) + " (" + host.stateText(player, lease) + ")", COIN, () -> manage(player, lease.claimId))));
         host.paged(player, t(player, "lw.myOffers"), rows.isEmpty() ? t(player, "lw.noOffers") : "", List.of(), rows, page, p -> myOffers(player, p), () -> menu(player));
     }
 
@@ -223,7 +223,7 @@ final class LeaseWindow {
         plugin.leases().allLeases().stream().filter(lease -> player.getUniqueId().toString().equals(lease.tenant))
                 .filter(lease -> plugin.getClaim(UUID.fromString(lease.claimId)).isPresent())
                 .sorted(Comparator.comparing(this::claimName, String.CASE_INSENSITIVE_ORDER))
-                .forEach(lease -> rows.add(new Row(claimName(lease) + " §8(" + host.stateText(player, lease) + ")", COIN, () -> rentalDetail(player, lease))));
+                .forEach(lease -> rows.add(new Row(claimName(lease) + " (" + host.stateText(player, lease) + ")", COIN, () -> rentalDetail(player, lease))));
         host.paged(player, t(player, "lw.myRentals"), rows.isEmpty() ? t(player, "lw.noRentals") : "", List.of(), rows, page, p -> myRentals(player, p), () -> menu(player));
     }
 

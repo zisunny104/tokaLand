@@ -124,7 +124,7 @@ public final class LandWindow implements Listener {
         List<Row> rows = new ArrayList<>();
         for (LandClaim claim : owned) {
             Lease held = plugin.leases().leaseOf(claim.id());
-            String label = held == null ? claim.name() : claim.name() + " §8(" + stateText(player, held) + ")";
+            String label = held == null ? claim.name() : claim.name() + " (" + stateText(player, held) + ")";
             rows.add(new Row(label, icon(claim, false), () -> detail(player, claim.id(), page, query)));
         }
         for (Lease held : plugin.leases().allLeases()) {
@@ -133,13 +133,13 @@ public final class LandWindow implements Listener {
             var found = plugin.getClaim(id);
             if (found.isEmpty() || ownedIds.contains(id) || !LeaseInput.matches(query, found.get().name(), held.claimId)) continue;
             ownedIds.add(id);
-            rows.add(new Row(found.get().name() + " §8(" + text(player, "window.rented") + " " + stateText(player, held) + ")", icon(found.get(), true),
+            rows.add(new Row(found.get().name() + " (" + text(player, "window.rented") + " " + stateText(player, held) + ")", icon(found.get(), true),
                     () -> detail(player, id, page, query)));
         }
         // Claims where the player is only a member, from the index's member map (no scan of every claim).
         plugin.index().memberOf(me).stream().filter(claim -> !ownedIds.contains(claim.id()) && LeaseInput.matches(query, claim.name(), claim.id().toString()))
                 .sorted(Comparator.comparing(LandClaim::name, String.CASE_INSENSITIVE_ORDER))
-                .forEach(claim -> rows.add(new Row(claim.name() + " §8(" + text(player, "window.memberTag") + ")", icon(claim, false), () -> detail(player, claim.id(), page, query))));
+                .forEach(claim -> rows.add(new Row(claim.name() + " (" + text(player, "window.memberTag") + ")", icon(claim, false), () -> detail(player, claim.id(), page, query))));
         List<Row> fixed = List.of(
                 new Row(text(player, "window.search"), "textures/ui/magnifyingGlass", () -> searchForm(player, query, q -> list(player, 0, q))),
                 new Row(text(player, "window.leaseMenu"), "textures/items/emerald", () -> lease.menu(player)),
