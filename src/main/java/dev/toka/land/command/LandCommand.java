@@ -38,6 +38,12 @@ public final class LandCommand extends Command {
         // One line in the usage list: the word, then the rest as free text. The words that follow are described by /land help.
         addCommandParameters("action",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandAction",new String[]{"help","menu","info","show","list","select","set","tpl","rename","del","give","type","group","leave","tpaccess","sub","lease","auction","fac","status","grant","refund","reset","clear","reload"})),
             CommandParameter.newType("arguments",true,CommandParamType.RAWTEXT)});
+        // The words used most get a line of their own so that their arguments are hinted; the rest are described by /land help.
+        for(String word:List.of("menu","info","show"))addCommandParameters(word,new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLand"+word,new String[]{word}))});
+        addCommandParameters("help",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandhelp",new String[]{"help"})),CommandParameter.newType("page",true,CommandParamType.INT)});
+        addCommandParameters("list",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandlist",new String[]{"list"})),CommandParameter.newType("page",true,CommandParamType.INT)});
+        addCommandParameters("set",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandset",new String[]{"set"})),CommandParameter.newType("name",CommandParamType.STRING)});
+        addCommandParameters("del",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLanddel",new String[]{"del"})),CommandParameter.newType("claim",true,CommandParamType.STRING)});
     }
     /** The claims the player is a member of are offered after "leave"; the free-text overload stays for names the client cannot list. */
     @Override public CommandDataVersions generateCustomCommandData(Player player){
