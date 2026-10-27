@@ -47,8 +47,10 @@ public final class LandCommand extends Command {
         addCommandParameters("leave",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandLeaveAction",new String[]{"leave"})),CommandParameter.newType("claim",CommandParamType.STRING)});
         addCommandParameters("tpaccess",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandTpAccessAction",new String[]{"tpaccess"})),CommandParameter.newType("claim",CommandParamType.STRING),
             CommandParameter.newEnum("who",new CommandEnum("TokaLandTpAccessWho",new String[]{"owner","member","all"}))});
-        addCommandParameters("del",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandDeleteAction",new String[]{"del"})),CommandParameter.newType("claim",true,CommandParamType.STRING),
-            CommandParameter.newEnum("refund",true,new CommandEnum("TokaLandDeleteRefund",new String[]{"norefund"}))});
+        addCommandParameters("del",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandDeleteAction",new String[]{"del"})),CommandParameter.newType("claim",true,CommandParamType.STRING)});
+        // an optional word is shown by the client as its enum name, so the word is a second overload where it is a required word
+        addCommandParameters("delNoRefund",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandDeleteAction",new String[]{"del"})),CommandParameter.newType("claim",CommandParamType.STRING),
+            CommandParameter.newEnum("refund",new CommandEnum("TokaLandDeleteRefund",new String[]{"norefund"}))});
         addCommandParameters("facHelp",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandFacilityHelpAction",new String[]{"fac"})),CommandParameter.newEnum("what",new CommandEnum("TokaLandFacilityHelp",new String[]{"help"}))});
         addCommandParameters("select",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandSelectAction",new String[]{"select"})),CommandParameter.newEnum("mode",new CommandEnum("TokaLandSelectMode",new String[]{"size","vert"}))});
         addCommandParameters("list",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandListAction",new String[]{"list"})),CommandParameter.newType("page",true,CommandParamType.INT)});
@@ -57,8 +59,13 @@ public final class LandCommand extends Command {
         addCommandParameters("facilityList",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandFacilityListAction",new String[]{"fac"})),
             CommandParameter.newEnum("sub",new CommandEnum("TokaLandFacilityList",new String[]{"list"})),CommandParameter.newType("page",true,CommandParamType.INT)});
         for(String sub:List.of("del","lock"))addCommandParameters("facility"+sub,new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandFacilityAction"+sub,new String[]{"fac"})),
-            CommandParameter.newEnum("sub",new CommandEnum("TokaLandFacilitySub"+sub,new String[]{sub})),CommandParameter.newType("name",CommandParamType.STRING),
-            CommandParameter.newEnum("state",true,new CommandEnum("TokaLandFacilityState"+sub,sub.equals("lock")?new String[]{"on","off"}:new String[]{"confirm"}))});
+            CommandParameter.newEnum("sub",new CommandEnum("TokaLandFacilitySub"+sub,new String[]{sub})),CommandParameter.newType("name",CommandParamType.STRING)});
+        addCommandParameters("facilitylockState",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandFacilityActionlock",new String[]{"fac"})),
+            CommandParameter.newEnum("sub",new CommandEnum("TokaLandFacilitySublock",new String[]{"lock"})),CommandParameter.newType("name",CommandParamType.STRING),
+            CommandParameter.newEnum("state",new CommandEnum("TokaLandFacilityStatelock",new String[]{"on","off"}))});
+        addCommandParameters("facilitydelConfirm",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandFacilityActiondel",new String[]{"fac"})),
+            CommandParameter.newEnum("sub",new CommandEnum("TokaLandFacilitySubdel",new String[]{"del"})),CommandParameter.newType("name",CommandParamType.STRING),
+            CommandParameter.newEnum("state",new CommandEnum("TokaLandFacilityStatedel",new String[]{"confirm"}))});
         addCommandParameters("facilitytype",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandFacilityActiontype",new String[]{"fac"})),
             CommandParameter.newEnum("sub",new CommandEnum("TokaLandFacilitySubtype",new String[]{"type"})),CommandParameter.newType("name",CommandParamType.STRING),
             CommandParameter.newEnum("type",new CommandEnum("TokaLandFacilityTypeValue",plugin.facilities().types().names().toArray(new String[0])))});
@@ -77,7 +84,8 @@ public final class LandCommand extends Command {
         addCommandParameters("refund",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandRefundAction",new String[]{"refund"})),
             CommandParameter.newType("amount",CommandParamType.INT),CommandParameter.newType("claim",true,CommandParamType.STRING)});
         addCommandParameters("reset",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandResetAction",new String[]{"reset"})),CommandParameter.newType("claim",true,CommandParamType.STRING)});
-        addCommandParameters("clear",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandClearAction",new String[]{"clear"})),CommandParameter.newEnum("step",true,new CommandEnum("TokaLandClearStep",new String[]{"confirm"}))});
+        addCommandParameters("clear",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandClearAction",new String[]{"clear"}))});
+        addCommandParameters("clearConfirm",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandClearAction",new String[]{"clear"})),CommandParameter.newEnum("step",new CommandEnum("TokaLandClearStep",new String[]{"confirm"}))});
         addCommandParameters("info",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandInfoAction",new String[]{"info"})),CommandParameter.newType("claimId",CommandParamType.STRING)});
     }
     /** One overload per lease subcommand so the client completes the words and number slots; claim names stay free text. */
