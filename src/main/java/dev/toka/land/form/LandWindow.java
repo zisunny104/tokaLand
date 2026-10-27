@@ -190,7 +190,7 @@ public final class LandWindow implements Listener {
     }
 
     /** Draws the claim's area for this player with BoundingBoxAPI; a claim that is made of several parts shows each part. */
-    private void showBounds(Player player, LandClaim claim) {
+    public void showBounds(Player player, LandClaim claim) {
         int part = 0;
         for (var selection : claim.selections()) BoundingBoxLink.show(plugin, player, selection, selection.ignoreHeight(), "land-" + claim.id() + "-" + part++);
         player.sendMessage(text(player, "window.boundsShown", claim.displayName(plugin.texts().language(player))));

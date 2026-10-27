@@ -25,6 +25,15 @@ final class ClaimTools {
         return true;
     }
 
+    /** Draws the bounds of the claims at the player's feet; read-only, so any player with use permission may look. */
+    boolean showHere(Player player) {
+        List<LandClaim> here = plugin.management().claimsAround(player);
+        if (here.isEmpty()) { send(player, "tools.noneHere"); return true; }
+        if (!dev.toka.land.BoundingBoxLink.available(plugin)) { send(player, "tools.boundsMissing"); return true; }
+        for (LandClaim claim : here) plugin.window().showBounds(player, claim);
+        return true;
+    }
+
     /** Names of the claims a player owns; the name is resolved to a UUID first, never matched by text. */
     boolean ownerList(CommandSender sender, String query) {
         UUID owner;

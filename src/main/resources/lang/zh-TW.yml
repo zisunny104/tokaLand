@@ -36,6 +36,7 @@ purchase:
   unavailable: "§e[領地] 尚未完成：${0}"
 tools:
   noneHere: "§e[領地] 這裡沒有玩家領地。"
+  boundsMissing: "§e[領地] 範圍顯示需要 BoundingBoxAPI 外掛，目前沒有啟用。"
   i:
     id: "領地 ID（這塊領地本身）：${0}"
     name: "名稱：${0}"
@@ -163,6 +164,7 @@ help:
   auctionList: "§e/land auction list [頁] §7- §b列出進行中的拍賣"
   auctionInfo: "§e/land auction info <ID或名稱> §7- §b查看價格、剩餘時間與最近的出價"
   info: "§e/land info §7- §b查看腳下的領地"
+  show: "§e/land show §7- §b在領地內顯示目前領地的範圍外框"
   list: "§e/land list [玩家] §7- §b列出玩家擁有的領地，不填為自己"
   select: "§e/land select <size|vert> §7- §b查看選區大小／切換是否忽略高度"
   tpl: "§e/land tpl [領地] §7- §b設定領地傳送點"

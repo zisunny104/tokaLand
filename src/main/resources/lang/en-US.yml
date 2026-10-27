@@ -36,6 +36,7 @@ purchase:
   unavailable: "§e[Land] Not completed: ${0}"
 tools:
   noneHere: "§e[Land] No player claim here."
+  boundsMissing: "§e[Land] Showing bounds needs the BoundingBoxAPI plugin, which is not enabled."
   i:
     id: "Claim ID (this claim itself): ${0}"
     name: "Name: ${0}"
@@ -163,6 +164,7 @@ help:
   auctionList: "§e/land auction list [page] §7- §bList running auctions"
   auctionInfo: "§e/land auction info <ID or name> §7- §bShow the price, the time left and the latest bids"
   info: "§e/land info §7- §bShow the claim under your feet"
+  show: "§e/land show §7- §bShow the outline of the claim you stand in"
   list: "§e/land list [player] §7- §bList a player's claims (default: you)"
   select: "§e/land select <size|vert> §7- §bShow the selection size / toggle ignoring height"
   tpl: "§e/land tpl [claim] §7- §bSet the claim's teleport point"

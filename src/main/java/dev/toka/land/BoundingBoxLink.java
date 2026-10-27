@@ -17,6 +17,8 @@ public final class BoundingBoxLink {
         return plugin != null && plugin.isEnabled() ? plugin : null;
     }
 
+    public static boolean available(Plugin from) { return api(from) != null; }
+
     /** Shows the box of one selection; a selection that ignores height is drawn over the whole height of the world. */
     public static void show(Plugin from, Player player, LandSelection part, boolean wholeHeight, String tag) {
         Plugin api = api(from);

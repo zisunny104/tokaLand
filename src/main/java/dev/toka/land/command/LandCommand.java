@@ -26,7 +26,7 @@ public final class LandCommand extends Command {
         this.plugin=plugin;
         this.tools=new ClaimTools(plugin);
         this.help=new HelpPages("land",List.of(
-            new HelpPages.Section("basics","tokaland.use",false,List.of("menu","info","list","select","set","tpl","rename","del")),
+            new HelpPages.Section("basics","tokaland.use",false,List.of("menu","info","show","list","select","set","tpl","rename","del")),
             new HelpPages.Section("manage","tokaland.use",true,List.of("give","type","group","leave","tpaccess","note")),
             new HelpPages.Section("sub","tokaland.use",true,List.of("sub","leaseMenu","leaseOffer","leaseSet","leaseCancel","leaseRent","leaseRelease","leaseInfo","leaseList")),
             new HelpPages.Section("auction","tokaland.use",true,List.of("auctionMenu","auctionStart","auctionBid","auctionCancel","auctionList","auctionInfo")),
@@ -72,6 +72,7 @@ public final class LandCommand extends Command {
         addCommandParameters("facilitymode",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandFacilityActionmode",new String[]{"fac"})),
             CommandParameter.newEnum("sub",new CommandEnum("TokaLandFacilitySubmode",new String[]{"mode"})),CommandParameter.newType("name",CommandParamType.STRING),
             CommandParameter.newEnum("value",new CommandEnum("TokaLandFacilityModeValue",new String[]{"open","protect","private"}))});
+        addCommandParameters("show",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandShowAction",new String[]{"show"}))});
         addCommandParameters("menu",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandMenuAction",new String[]{"menu"}))});
         addLeaseParameters();
         addAuctionParameters();
@@ -149,6 +150,7 @@ public final class LandCommand extends Command {
         if(sender instanceof Player self&&sender.hasPermission("tokaland.use")){
             if((action.equals("menu")||action.equals("gui"))&&args.length==1){plugin.window().open(self);return true;}
             if(action.equals("info")&&args.length==1)return tools.localInfo(self);
+            if(action.equals("show")&&args.length==1)return tools.showHere(self);
             if(action.equals("list")&&args.length==2&&!args[1].chars().allMatch(Character::isDigit))return tools.ownerList(sender,args[1]);
             if(action.equals("list")&&args.length==1&&!sender.hasPermission("tokaland.inspect"))return tools.ownerList(sender,self.getName());
             if(Set.of("reset","clear","grant","refund").contains(action))return adminTool(self,action,args);
