@@ -254,7 +254,7 @@ lw:
   cancelText: "確定取消 ${0} 的出租？"
   noLettings: "目前沒有開放出租的下級領地。"
   lettingButton: "${0} - 每期 ${1}"
-  periodOption: "${0} 期　共 ${1}"
+  periodOption: "${0} 期 共 ${1}"
   rentInfo: "每期 ${0}；一期 ${1}；最多 ${2} 期"
   periods: "預付期數（共計金額）"
   startDate: "起始日（選填，yyyy-MM-dd）"
