@@ -1,6 +1,6 @@
 name: tokaLand
 main: dev.toka.land.Main
-version: "0.3.19"
+version: "0.3.20"
 api: ["1.0.4"]
 load: POSTWORLD
 softdepend: [BoundingBoxAPI, tokaDisplay, tokaProfiles, tokaWorlds, tokaEconomy]

@@ -167,7 +167,7 @@ public final class LandWindow implements Listener {
         // The way there is tokaPortal's, and only a claim with a teleport point that this player may use can be gone to.
         if (portal() != null && mayGo(player, claim)) menu.button(text(player, "window.teleport"), "textures/items/ender_pearl", () -> goTo(player, claim));
         if (member) {
-            menu.button(text(player, "window.leave"), "textures/ui/door_iron", () -> confirm(player, text(player, "window.leave"),
+            menu.button(text(player, "window.leave"), "textures/items/door_iron", () -> confirm(player, text(player, "window.leave"),
                     text(player, "window.leaveText", claim.name()), () -> run(player, "land leave " + id)));
             menu.button(text(player, "window.close"), null, () -> { });
             menu.show();
