@@ -63,8 +63,18 @@ public final class Trading implements Listener, AutoCloseable {
         JsonObject request = new JsonObject();
         request.addProperty("action", "SELECT");
         request.add("point", GSON.toJsonTree(point));
-        return plugin.providers().ask(player, request).map(reply -> reply.get("ignoreHeight").getAsBoolean())
+        return ask(player, request).map(reply -> reply.get("ignoreHeight").getAsBoolean())
                 .orElse(plugin.getConfig().getBoolean("selection.default-ignore-height", false));
+    }
+
+    /** The region provider's answer; an administrator is not held back by a region that is closed to purchases (public works go there). */
+    private java.util.Optional<JsonObject> ask(Player player, JsonObject request) {
+        try {
+            return plugin.providers().ask(player, request);
+        } catch (IllegalStateException denied) {
+            if (player.hasPermission("tokaland.admin") && "PURCHASE_POLICY_DENIED".equals(denied.getMessage())) return java.util.Optional.empty();
+            throw denied;
+        }
     }
 
     /** What a selection holds and what it would cost, both as footprint and as volume; the area decides which of the two is charged. */
@@ -81,7 +91,7 @@ public final class Trading implements Listener, AutoCloseable {
         JsonObject none = new JsonObject();
         none.addProperty("offer", 1.0);
         none.addProperty("tax", 1.0);
-        JsonObject adjustment = plugin.providers().ask(player, request).orElse(none);
+        JsonObject adjustment = ask(player, request).orElse(none);
         double offer = adjustment.get("offer").getAsDouble(), tax = adjustment.get("tax").getAsDouble();
         return new Preview(LandPricing.area(part), LandPricing.volume(part), pricing.quoteFlat(part, offer, tax), pricing.quoteVolume(part, offer, tax), draft.ignoreHeight());
     }
@@ -105,7 +115,7 @@ public final class Trading implements Listener, AutoCloseable {
         JsonObject none = new JsonObject();
         none.addProperty("offer", 1.0);
         none.addProperty("tax", 1.0);
-        JsonObject adjustment = plugin.providers().ask(player, request).orElse(none);
+        JsonObject adjustment = ask(player, request).orElse(none);
         long amount = pricing.quote(part, adjustment.get("offer").getAsDouble(), adjustment.get("tax").getAsDouble());
         // The treasury (if the provider names one) receives the whole price and later pays the refund.
         UUID treasury = adjustment.has("beneficiary") ? UUID.fromString(adjustment.get("beneficiary").getAsString()) : null;
