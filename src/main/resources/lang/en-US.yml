@@ -179,6 +179,8 @@ help:
   note: "§8[claim] is an ID or a name; required when several claims are under your feet."
   grant: "§e/land grant <player> <name> §7- §bCreate a claim for a player from the selection, free and not refundable"
   refund: "§e/land refund <amount> [claim] §7- §bSet what deleting the claim pays back; 0 = nothing"
+  deleted: "§e/land deleted [page] §7- §bList deleted claims that can be restored, with their IDs"
+  restore: "§e/land restore <claim ID> §7- §bPut a deleted claim back as it was; the refund is not taken back, settle it by hand"
   reset: "§e/land reset [claim] §7- §bReplace the claim's shape with the selection"
   clear: "§e/land clear [confirm] §7- §bPreview, then delete all player claims in the selection, no refund"
   fac: "§e/land fac <type> [name] §7- §bCreate a facility claim from the selection (same name adds a part)"
@@ -196,6 +198,11 @@ grant:
   done: "§a[Land] Created ${1} for ${0} (free, not refundable)."
 refund:
   done: "§a[Land] Deleting ${0} now pays back ${1}."
+restore:
+  listHeader: "§b[Land] Deleted claims, page ${0}/${1}, ${2} in all"
+  listRow: "§7${0} §f${1} §7refund ${2} ${3}"
+  done: "§a[Land] Claim ${0} restored. The refund paid at deletion (${1}) is not taken back."
+  failed: "§c[Land] Cannot restore: ${0} ${1}"
 lease:
   usage: "§eSub-claims: /land sub <name> (select the area first; the upper claim is found from the selection); letting: /land lease offer <sub> <rent> [days], set <sub> <max|grace|renew|discount|rent> <value>, cancel, rent <sub> [periods] [start yyyy-MM-dd] [end yyyy-MM-dd], release, info, list; type /land help sub for details"
   noParent: "§cThe selection has to lie completely inside one claim."

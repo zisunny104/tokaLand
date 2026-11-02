@@ -179,6 +179,8 @@ help:
   note: "§8[領地] 可填領地 ID 或名稱；腳下有多塊領地時必須指定。"
   grant: "§e/land grant <玩家> <名稱> §7- §b用選區直接為玩家建立領地，免費且不可退款"
   refund: "§e/land refund <金額> [領地] §7- §b設定刪除領地時的退款，0＝不可退款"
+  deleted: "§e/land deleted [頁] §7- §b列出已刪除、可還原的領地與 ID"
+  restore: "§e/land restore <領地ID> §7- §b把已刪除的領地原樣還原；退款不會自動收回，請另行處理"
   reset: "§e/land reset [領地] §7- §b用選區取代領地範圍"
   clear: "§e/land clear [confirm] §7- §b預覽並刪除選區內所有玩家領地，不退款"
   fac: "§e/land fac <類型> [名稱] §7- §b用選區建立設施領地（同名則追加選區）"
@@ -196,6 +198,15 @@ grant:
   done: "§a[領地] 已為 ${0} 建立領地 ${1}（免費、不可退款）。"
 refund:
   done: "§a[領地] ${0} 刪除時的退款已設為 ${1}。"
+restore:
+  # ${0}=頁 ${1}=總頁數 ${2}=筆數
+  listHeader: "§b[領地] 已刪除的領地 第 ${0}/${1} 頁，共 ${2} 筆"
+  # ${0}=領地ID ${1}=名稱 ${2}=退款金額 ${3}=幣別
+  listRow: "§7${0} §f${1} §7退款 ${2} ${3}"
+  # ${0}=領地ID ${1}=刪除時付出的退款（金額 幣別 領取人，不會自動收回）
+  done: "§a[領地] 已還原領地 ${0}。刪除時付出的退款：${1}，不會自動收回。"
+  # ${0}=狀態 ${1}=原因
+  failed: "§c[領地] 無法還原：${0} ${1}"
 lease:
   usage: "§e下級領地：/land sub <名稱>（先選好範圍，上級領地由選區判斷）；租賃：/land lease offer <下級領地> <租金> [天數]、set <下級領地> <max|grace|renew|discount|rent> <值>、cancel、rent <下級領地> [期數] [start yyyy-MM-dd] [end yyyy-MM-dd]、release、info、list；輸入 /land help sub 查看說明"
   noParent: "§c選區必須完全位於同一塊領地內。"

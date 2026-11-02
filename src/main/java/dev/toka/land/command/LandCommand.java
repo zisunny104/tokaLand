@@ -30,13 +30,13 @@ public final class LandCommand extends Command {
             new HelpPages.Section("manage","tokaland.use",true,List.of("give","type","group","leave","tpaccess","note")),
             new HelpPages.Section("sub","tokaland.use",true,List.of("sub","leaseMenu","leaseOffer","leaseSet","leaseCancel","leaseRent","leaseRelease","leaseInfo","leaseList")),
             new HelpPages.Section("auction","tokaland.use",true,List.of("auctionMenu","auctionStart","auctionBid","auctionCancel","auctionList","auctionInfo")),
-            new HelpPages.Section("admin","tokaland.admin",true,List.of("grant","refund","reset","clear","reload","fac","facHelp")),
+            new HelpPages.Section("admin","tokaland.admin",true,List.of("grant","refund","reset","clear","deleted","restore","reload","fac","facHelp")),
             new HelpPages.Section("facility","tokaland.admin",true,List.of("facCreate","facList","facDel","facType","facMode","facLock")),
             new HelpPages.Section("inspect","tokaland.inspect",true,List.of("status","adminList","adminInfo"))),(sender,key,args)->plugin.texts().text(sender,key,args));
         setPermission("tokaland.use;tokaland.inspect");
         getCommandParameters().clear();
         // One line in the usage list: the word, then the rest as free text. The words that follow are described by /land help.
-        addCommandParameters("action",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandAction",new String[]{"help","menu","info","show","list","select","set","tpl","rename","del","give","type","group","leave","tpaccess","sub","lease","auction","fac","status","grant","refund","reset","clear","reload"})),
+        addCommandParameters("action",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandAction",new String[]{"help","menu","info","show","list","select","set","tpl","rename","del","give","type","group","leave","tpaccess","sub","lease","auction","fac","status","grant","refund","reset","clear","deleted","restore","reload"})),
             CommandParameter.newType("arguments",true,CommandParamType.RAWTEXT)});
         // The words used most get a line of their own so that their arguments are hinted; the rest are described by /land help.
         for(String word:List.of("menu","info","show"))addCommandParameters(word,new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLand"+word,new String[]{word}))});
@@ -81,7 +81,7 @@ public final class LandCommand extends Command {
             if(action.equals("show")&&args.length==1)return tools.showHere(self);
             if(action.equals("list")&&args.length==2&&!args[1].chars().allMatch(Character::isDigit))return tools.ownerList(sender,args[1]);
             if(action.equals("list")&&args.length==1&&!sender.hasPermission("tokaland.inspect"))return tools.ownerList(sender,self.getName());
-            if(Set.of("reset","clear","grant","refund").contains(action))return adminTool(self,action,args);
+            if(Set.of("reset","clear","grant","refund","deleted","restore").contains(action))return adminTool(self,action,args);
         }
         if(!sender.hasPermission("tokaland.inspect")){send(sender,"command.denied");return true;}
         if(action.equals("status")&&args.length==1){send(sender,"command.status",Main.ownsLand()?"ACTIVE":"STANDBY",plugin.allClaims().size());return true;}
@@ -146,6 +146,26 @@ public final class LandCommand extends Command {
             if(action.equals("clear")){
                 if(args.length>2||args.length==2&&!args[1].equalsIgnoreCase("confirm")){send(player,"command.usage");return true;}
                 return tools.clear(player,args.length==2);
+            }
+            if(action.equals("deleted")){
+                var all=plugin.trading().deleted();int page=1;
+                if(args.length>2){send(player,"command.usage");return true;}
+                if(args.length==2)page=Integer.parseInt(args[1]);
+                int pages=all.isEmpty()?1:(all.size()-1)/10+1;
+                if(page<1||page>pages){send(player,"command.invalidPage");return true;}
+                send(player,"restore.listHeader",page,pages,all.size());
+                for(int i=(page-1)*10;i<Math.min(page*10,all.size());i++){var d=all.get(i);send(player,"restore.listRow",d.id(),d.name(),d.amount(),d.currency());}
+                return true;
+            }
+            if(action.equals("restore")){
+                if(args.length!=2){send(player,"command.usage");return true;}
+                UUID id=UUID.fromString(args[1]);
+                plugin.trading().restore(id).whenComplete((result,error)->plugin.getServer().getScheduler().scheduleTask(plugin,()->{
+                    if(error!=null)send(player,"purchase.unavailable",rootMessage(error));
+                    else if(result.status().equals("RESTORED"))send(player,"restore.done",result.operation(),result.detail());
+                    else send(player,"restore.failed",result.status(),result.detail());
+                }));
+                return true;
             }
             if(action.equals("grant")){
                 if(args.length!=3){send(player,"command.usage");return true;}

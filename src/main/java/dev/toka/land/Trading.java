@@ -158,6 +158,9 @@ public final class Trading implements Listener, AutoCloseable {
         return sales.sell(claim, recipient, pricing.currency(), amount, amount > 0 ? source : null);
     }
 
+    public java.util.List<SaleCoordinator.Deleted> deleted() { return sales.deleted(); }
+    public CompletableFuture<PurchaseCoordinator.Outcome> restore(UUID claimId) { return sales.restore(claimId); }
+
     /** Called periodically: reconnects tokaEconomy after a reload and finishes interrupted transactions. */
     public void maintain() {
         connectEconomy();

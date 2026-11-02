@@ -34,6 +34,33 @@ public final class SaleCoordinator implements AutoCloseable {
         }catch(RuntimeException invalid){throw new IOException("Invalid sale journal: "+key,invalid);}
         publish();
     }
+    /** A deleted claim whose sale finished; its journal keeps the claim until an admin restores it. */
+    public record Deleted(UUID id,String name,UUID recipient,String currency,long amount){}
+    public synchronized List<Deleted> deleted(){
+        return entries.values().stream().filter(e->e.state==State.COMPLETED)
+            .map(e->new Deleted(e.claim.id(),e.claim.name(),e.recipient,e.currency,e.amount)).sorted(Comparator.comparing(Deleted::name)).toList();
+    }
+    /**
+     * Puts a deleted claim back as it was. The refund that was paid is not taken back: the outcome names it so that an admin can settle it.
+     * The journal moves to "restored.", so deleting the claim again starts a new sale instead of finding the old one finished.
+     */
+    public CompletableFuture<PurchaseCoordinator.Outcome> restore(UUID id){
+        return CompletableFuture.supplyAsync(()->{
+            try{
+                Entry entry;synchronized(this){entry=entries.get(id);}
+                if(entry==null||entry.state!=State.COMPLETED)return new PurchaseCoordinator.Outcome("REJECTED",id,"NOT_DELETED");
+                try{lands.create(entry.claim).get(30,TimeUnit.SECONDS);}
+                catch(Exception failure){
+                    if(root(failure) instanceof LandService.ClaimConflict conflict)return new PurchaseCoordinator.Outcome("REJECTED",id,conflict.getMessage());
+                    throw failure;
+                }
+                var data=store.load("sale."+id).orElseThrow();
+                store.save("restored."+id,data);store.delete("sale."+id);
+                synchronized(this){entries.remove(id);publish();}
+                return new PurchaseCoordinator.Outcome("RESTORED",id,entry.amount+" "+entry.currency+" "+entry.recipient);
+            }catch(Exception failure){return new PurchaseCoordinator.Outcome("PENDING",id,root(failure).getClass().getSimpleName());}
+        },worker);
+    }
     public boolean hasPending(){return !pending.isEmpty();}
     public boolean hasPending(UUID claim){return pending.contains(claim);}
     /** @param source the account that pays the refund, or null when the refund is created */

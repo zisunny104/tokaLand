@@ -86,4 +86,35 @@ public class SaleCoordinatorTest {
             }
         }
     }
+    @Test public void deletedClaimIsListedAndRestoredOnceWithoutBlockingANewSale()throws Exception{
+        try(var store=DocumentStore.open(new StoreConfig(Backend.JSON,temporary.newFolder().toPath(),1));var lands=new LandService(new DatasetRepository(store))){
+            var c=claim();lands.create(c).get();var ledger=new Ledger();
+            try(var sales=new SaleCoordinator(lands,store,()->ledger)){
+                assertEquals("REJECTED",sales.restore(c.id()).get().status());
+                assertEquals("COMPLETED",sales.sell(c,c.ownerId(),"money",70,null).get().status());
+                assertEquals(List.of(new SaleCoordinator.Deleted(c.id(),"Home",c.ownerId(),"money",70)),sales.deleted());
+                var restored=sales.restore(c.id()).get();assertEquals("RESTORED",restored.status());
+                assertTrue(restored.detail().startsWith("70 money"));
+                assertEquals(c,lands.snapshot().index().get(c.id()).orElseThrow());assertTrue(sales.deleted().isEmpty());
+                assertTrue(store.load("restored."+c.id()).isPresent());assertTrue(store.load("sale."+c.id()).isEmpty());
+                assertEquals("REJECTED",sales.restore(c.id()).get().status());
+                assertEquals("COMPLETED",sales.sell(c,c.ownerId(),"money",70,null).get().status());
+                assertTrue(lands.snapshot().index().all().isEmpty());
+            }
+        }
+    }
+    @Test public void restoreRefusesWhenAnotherClaimNowTakesTheSpace()throws Exception{
+        try(var store=DocumentStore.open(new StoreConfig(Backend.JSON,temporary.newFolder().toPath(),1));var lands=new LandService(new DatasetRepository(store))){
+            var c=claim();lands.create(c).get();var ledger=new Ledger();
+            try(var sales=new SaleCoordinator(lands,store,()->ledger)){
+                assertEquals("COMPLETED",sales.sell(c,c.ownerId(),"money",5,null).get().status());
+                UUID other=UUID.randomUUID();
+                lands.create(new LandClaim(UUID.randomUUID(),"Other",ClaimKind.PLAYER,"land",other,null,false,true,
+                    List.of(new LandSelection("world",5,0,5,15,20,15,false)),List.of(),AccessPolicy.privateDefault(),Map.of(),null,"O",new ClaimDetails(other,"O",null,true))).get();
+                var result=sales.restore(c.id()).get();
+                assertEquals("REJECTED",result.status());assertEquals("SELECTION_CONFLICT",result.detail());
+                assertEquals(1,sales.deleted().size());
+            }
+        }
+    }
 }
