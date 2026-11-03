@@ -84,6 +84,23 @@ public final class PurchaseCoordinator implements AutoCloseable {
             catch(Exception failure){return new Outcome("PENDING",claim.id(),root(failure).getClass().getSimpleName());}
         },worker);
     }
+    /**
+     * Finishes a purchase that stands before its payment, at the given percent of the quoted price (an administrator's settlement of a stuck purchase).
+     * A purchase that has been paid is left alone: its price is already taken.
+     */
+    public CompletableFuture<Outcome> settle(UUID claimId,int percent){
+        return CompletableFuture.supplyAsync(()->{
+            try{
+                Entry entry=entries.get(claimId);
+                if(entry==null||!entry.pending())return new Outcome("REJECTED",claimId,"NO_PENDING_PURCHASE");
+                if(entry.state!=State.PREPARED)return new Outcome("REJECTED",claimId,"ALREADY_PAID");
+                if(percent<0||percent>100)return new Outcome("REJECTED",claimId,"INVALID_PERCENT");
+                long price=entry.amount*percent/100;
+                Entry settled=new Entry(entry.claim,entry.currency,price,entry.beneficiary,State.PREPARED);save(settled);
+                return advance(settled);
+            }catch(Exception failure){return new Outcome("PENDING",claimId,root(failure).getClass().getSimpleName());}
+        },worker);
+    }
     public synchronized CompletableFuture<List<Outcome>> recover(){
         if(recovery!=null&&!recovery.isDone())return recovery;
         recovery=CompletableFuture.supplyAsync(()->{
@@ -139,7 +156,7 @@ public final class PurchaseCoordinator implements AutoCloseable {
         publishPending();
         try{
             store.save(key,data);
-            if(!store.load(key).orElseThrow().equals(data))throw new IOException("Purchase journal readback mismatch");
+            if(!com.google.gson.JsonParser.parseString(data.toString()).equals(store.load(key).orElseThrow()))throw new IOException("Purchase journal readback mismatch");
         }catch(IOException failure){
             // A terminal state is not published in memory until its acknowledgement is confirmed.
             if(previous!=null)entries.put(entry.claim.id(),previous);

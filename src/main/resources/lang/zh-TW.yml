@@ -10,7 +10,7 @@ command:
   usage: "§e請輸入 /land help 查看可用指令。"
   reloaded: "§a已重新讀取設定與語言。"
 management:
-  treasuryShort: "§e[領地] 國庫餘額不足以退款。若仍要刪除且放棄退款，請在指令最後加上 norefund。"
+  treasuryShort: "§e[領地] 公有帳戶餘額不足以退款。若仍要刪除且放棄退款，請在指令最後加上 norefund。"
   saleStarted: "§b[領地] 正在保存刪除與退款交易，請等待結果。"
   saleResult: "§b[領地] 刪除／退款狀態：${0}；編號：${1}；${2}"
   ambiguous: "§e[領地] 同時命中多筆，請在指令最後指定領地 ID 或唯一名稱："
@@ -175,12 +175,13 @@ help:
   group: "§e/land group <add|visitor|del|list> [玩家] [領地] §7- §b管理分享成員；add 為成員，visitor 為訪客（只能進入與傳送）"
   leave: "§e/land leave <領地> §7- §b離開自己是成員的領地"
   tpaccess: "§e/land tpaccess <領地> <owner|member|all> §7- §b設定誰可以使用領地傳送點：擁有者／加上成員／所有人"
-  del: "§e/land del [領地] [norefund] §7- §b刪除領地並領取退款；國庫不足時加 norefund 放棄退款"
+  del: "§e/land del [領地] [norefund] §7- §b刪除領地並領取退款；公有帳戶不足時加 norefund 放棄退款"
   note: "§8[領地] 可填領地 ID 或名稱；腳下有多塊領地時必須指定。"
   grant: "§e/land grant <玩家> <名稱> §7- §b用選區直接為玩家建立領地，免費且不可退款"
   refund: "§e/land refund <金額> [領地] §7- §b設定刪除領地時的退款，0＝不可退款"
   deleted: "§e/land deleted [頁] §7- §b列出已刪除、可還原的領地與 ID"
   restore: "§e/land restore <領地ID> §7- §b把已刪除的領地原樣還原；退款不會自動收回，請另行處理"
+  settle: "§e/land settle <領地ID> [百分比] §7- §b把卡住（尚未扣款）的購買按報價的百分比（預設 100）完成"
   reset: "§e/land reset [領地] §7- §b用選區取代領地範圍"
   clear: "§e/land clear [confirm] §7- §b預覽並刪除選區內所有玩家領地，不退款"
   fac: "§e/land fac <類型> [名稱] §7- §b用選區建立設施領地（同名則追加選區）"
@@ -198,6 +199,9 @@ grant:
   done: "§a[領地] 已為 ${0} 建立領地 ${1}（免費、不可退款）。"
 refund:
   done: "§a[領地] ${0} 刪除時的退款已設為 ${1}。"
+settle:
+  # ${0}=狀態 ${1}=原因
+  result: "§b[領地] 購買結算：${0} ${1}"
 restore:
   # ${0}=頁 ${1}=總頁數 ${2}=筆數
   listHeader: "§b[領地] 已刪除的領地 第 ${0}/${1} 頁，共 ${2} 筆"

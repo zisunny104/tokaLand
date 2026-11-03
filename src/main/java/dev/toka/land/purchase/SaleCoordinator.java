@@ -114,7 +114,7 @@ public final class SaleCoordinator implements AutoCloseable {
         data.addProperty("currency",entry.currency);data.addProperty("amount",entry.amount);data.addProperty("state",entry.state.name());
         if(entry.source!=null)data.addProperty("source",entry.source.toString());
         Entry previous=entries.put(entry.claim.id(),entry);publish();
-        try{String key="sale."+entry.claim.id();store.save(key,data);if(!store.load(key).orElseThrow().equals(data))throw new IOException("Sale readback mismatch");}
+        try{String key="sale."+entry.claim.id();store.save(key,data);if(!com.google.gson.JsonParser.parseString(data.toString()).equals(store.load(key).orElseThrow()))throw new IOException("Sale readback mismatch");}
         catch(IOException failure){if(previous!=null)entries.put(entry.claim.id(),previous);publish();throw failure;}
     }
     private static PurchaseCoordinator.Outcome result(String status,Entry entry,String detail){return new PurchaseCoordinator.Outcome(status,entry.claim.id(),detail);}

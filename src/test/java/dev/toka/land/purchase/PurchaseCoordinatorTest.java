@@ -123,4 +123,16 @@ public class PurchaseCoordinatorTest {
             assertEquals("COMPLETED",purchases.purchase(claim("Exempt",0),"money",0,null).get().status());assertEquals(1,lands.snapshot().index().all().size());
         }
     }
+    @Test public void purchaseWithFractionalTeleportAnglesIsJournalledAndCompletes()throws Exception{
+        for(Backend backend:new Backend[]{Backend.JSON,Backend.SQLITE})
+        try(var store=DocumentStore.open(new StoreConfig(backend,temporary.newFolder().toPath(),1));var lands=new LandService(new DatasetRepository(store))){
+            UUID owner=UUID.randomUUID();var ledger=new Ledger();
+            var c=new LandClaim(UUID.randomUUID(),"Angles",ClaimKind.PLAYER,"land",owner,null,false,false,
+                List.of(new LandSelection("world",158,85,24,181,106,40,false)),List.of(),AccessPolicy.privateDefault(),Map.of(),null,"Owner",
+                new ClaimDetails(owner,"Owner",new ClaimDetails.TeleportPoint("world",170.57296752929688,87.00000762939453,35.39828109741211,180.90305f,-2.0974274f),true));
+            try(var purchases=new PurchaseCoordinator(lands,store,()->ledger)){
+                assertEquals(backend+"","COMPLETED",purchases.purchase(c,"money",60,null).get().status());
+            }
+        }
+    }
 }

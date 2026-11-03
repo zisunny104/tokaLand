@@ -29,7 +29,7 @@ public final class AuctionBook {
     public synchronized void save(Auction auction) throws IOException {
         var json = auction.toJson();
         store.save(PREFIX + auction.id, json);
-        if (!store.load(PREFIX + auction.id).orElseThrow().equals(json)) throw new IOException("Auction readback mismatch");
+        if (!com.google.gson.JsonParser.parseString(json.toString()).equals(store.load(PREFIX + auction.id).orElseThrow())) throw new IOException("Auction readback mismatch");
         auctions.put(auction.id, auction);
     }
 

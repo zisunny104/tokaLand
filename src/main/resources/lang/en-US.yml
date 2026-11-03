@@ -181,6 +181,7 @@ help:
   refund: "§e/land refund <amount> [claim] §7- §bSet what deleting the claim pays back; 0 = nothing"
   deleted: "§e/land deleted [page] §7- §bList deleted claims that can be restored, with their IDs"
   restore: "§e/land restore <claim ID> §7- §bPut a deleted claim back as it was; the refund is not taken back, settle it by hand"
+  settle: "§e/land settle <claim ID> [percent] §7- §bFinish a stuck purchase that has not been paid, at the percent of its quote (default 100)"
   reset: "§e/land reset [claim] §7- §bReplace the claim's shape with the selection"
   clear: "§e/land clear [confirm] §7- §bPreview, then delete all player claims in the selection, no refund"
   fac: "§e/land fac <type> [name] §7- §bCreate a facility claim from the selection (same name adds a part)"
@@ -198,6 +199,8 @@ grant:
   done: "§a[Land] Created ${1} for ${0} (free, not refundable)."
 refund:
   done: "§a[Land] Deleting ${0} now pays back ${1}."
+settle:
+  result: "§b[Land] Purchase settlement: ${0} ${1}"
 restore:
   listHeader: "§b[Land] Deleted claims, page ${0}/${1}, ${2} in all"
   listRow: "§7${0} §f${1} §7refund ${2} ${3}"

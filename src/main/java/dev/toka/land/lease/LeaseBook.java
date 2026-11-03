@@ -30,7 +30,7 @@ public final class LeaseBook {
     public synchronized void save(Lease lease) throws IOException {
         var json = lease.toJson();
         store.save(PREFIX + lease.claimId, json);
-        if (!store.load(PREFIX + lease.claimId).orElseThrow().equals(json)) throw new IOException("Lease readback mismatch");
+        if (!com.google.gson.JsonParser.parseString(json.toString()).equals(store.load(PREFIX + lease.claimId).orElseThrow())) throw new IOException("Lease readback mismatch");
         leases.put(lease.claimId, lease);
     }
 

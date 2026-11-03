@@ -64,14 +64,14 @@ public final class DatasetRepository {
             refs.addProperty(id,key);
             Optional<JsonObject> existing=store.load(key);
             if(existing.isEmpty())writes.put(key,data);
-            else if(!existing.get().equals(data))throw new IOException("Content-addressed document collision");
+            else if(!com.google.gson.JsonParser.parseString(data.toString()).equals(existing.get()))throw new IOException("Content-addressed document collision");
         }
         store.saveAll(writes);
-        for(var entry:writes.entrySet())if(!store.load(entry.getKey()).orElseThrow().equals(entry.getValue()))throw new IOException("Claim readback mismatch");
+        for(var entry:writes.entrySet())if(!com.google.gson.JsonParser.parseString(entry.getValue().toString()).equals(store.load(entry.getKey()).orElseThrow()))throw new IOException("Claim readback mismatch");
         JsonObject manifest=new JsonObject();manifest.addProperty("format",1);manifest.add("claims",refs);manifest.addProperty("revision",digest(refs));
         var old=store.load("dataset");if(old.isPresent())store.save("dataset.previous",old.get());
         store.save("dataset",manifest);
-        if(!store.load("dataset").orElseThrow().equals(manifest))throw new IOException("Dataset manifest readback mismatch");
+        if(!com.google.gson.JsonParser.parseString(manifest.toString()).equals(store.load("dataset").orElseThrow()))throw new IOException("Dataset manifest readback mismatch");
         Map<String,String> keys=new HashMap<>();
         refs.entrySet().forEach(entry->keys.put(entry.getKey(),entry.getValue().getAsString()));
         currentKeys=keys;
