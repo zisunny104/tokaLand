@@ -2,6 +2,9 @@ package dev.toka.land.protection;
 
 import cn.nukkit.Player;
 import cn.nukkit.entity.Entity;
+import cn.nukkit.entity.item.EntityBoat;
+import cn.nukkit.entity.item.EntityChestBoat;
+import cn.nukkit.entity.item.EntityMinecartEmpty;
 import cn.nukkit.entity.projectile.EntityProjectile;
 import cn.nukkit.event.*;
 import cn.nukkit.event.block.*;
@@ -56,6 +59,8 @@ public final class PlayerProtectionListener implements Listener {
     }
     @EventHandler(ignoreCancelled=true)
     public void onPlayerInteractEntity(PlayerInteractEntityEvent event){
+        // Boarding a boat or an empty minecart is not an interaction with the land; the ones that hold items stay protected
+        if(event.getEntity() instanceof EntityMinecartEmpty||(event.getEntity() instanceof EntityBoat&&!(event.getEntity() instanceof EntityChestBoat)))return;
         if(event.getEntity()!=null)enforce(event,event.getPlayer(),event.getEntity().getPosition(),ClaimPermission.INTERACT);
     }
     @EventHandler(ignoreCancelled=true)
