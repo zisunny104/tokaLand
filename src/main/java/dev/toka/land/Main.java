@@ -46,6 +46,7 @@ public final class Main extends PluginBase {
     private ExplosionRules explosionRules;
     private SelectionToolListener selectionTool;
     private LandCommand command;
+    private dev.toka.land.command.FacilityCommand facilityCommand;
     private volatile boolean ready;
     private volatile boolean ownership;
     private volatile boolean maintenanceLocked;
@@ -136,6 +137,12 @@ public final class Main extends PluginBase {
             texts.warn("log.commandFailed");
             command = null;
         }
+        if (commands.getCommand("fac") == null) {
+            facilityCommand = new dev.toka.land.command.FacilityCommand(this);
+            commands.register("tokaLand", facilityCommand);
+        } else {
+            getLogger().warning("/fac is already registered by another plugin");
+        }
     }
 
     @Override public void onDisable() {
@@ -149,6 +156,11 @@ public final class Main extends PluginBase {
     }
 
     private void closeAll() {
+        if (facilityCommand != null) {
+            var commands = getServer().getCommandMap();
+            commands.getCommands().entrySet().removeIf(entry -> entry.getValue() == facilityCommand);
+            facilityCommand.unregister(commands);
+        }
         if (command != null) {
             var commands = getServer().getCommandMap();
             commands.getCommands().entrySet().removeIf(entry -> entry.getValue() == command);

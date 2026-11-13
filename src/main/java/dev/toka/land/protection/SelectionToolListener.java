@@ -17,11 +17,22 @@ import java.util.UUID;
 /** Captures temporary selection corners with a configurable item; it never writes claims. */
 public final class SelectionToolListener implements Listener {
     public record Point(String world,int x,int y,int z) { }
-    public record Selection(Point first,Point second,boolean ignoreHeight,TeleportPoint teleport) {
+    public record Selection(Point first,Point second,boolean ignoreHeight,TeleportPoint teleport,boolean exactBounds) {
+        public Selection(Point first,Point second,boolean ignoreHeight,TeleportPoint teleport) {
+            this(first,second,ignoreHeight,teleport,false);
+        }
         public LandSelection geometry(){
             if(first==null||second==null||!first.world().equals(second.world()))throw new IllegalStateException("SELECTION_REQUIRED");
             return new LandSelection(first.world(),first.x(),first.y(),first.z(),second.x(),second.y(),second.z(),ignoreHeight);
         }
+    }
+
+    public void select(Player player, Point first, Point second, boolean ignoreHeight) {
+        var draft = new Selection(first, second, ignoreHeight, null, true);
+        draft.geometry();
+        selections.put(player.getUniqueId(), draft);
+        lastClick.remove(player.getUniqueId());
+        announce(player, draft);
     }
 
     private final Main plugin;
@@ -72,7 +83,7 @@ public final class SelectionToolListener implements Listener {
     }
     public Selection toggleHeight(UUID player){
         Selection old=selections.get(player);if(old==null)throw new IllegalStateException("SELECTION_REQUIRED");
-        var changed=new Selection(old.first(),old.second(),!old.ignoreHeight(),null);selections.put(player,changed);
+        var changed=new Selection(old.first(),old.second(),!old.ignoreHeight(),null,old.exactBounds());selections.put(player,changed);
         plugin.getServer().getPlayer(player).ifPresent(online->announce(online,changed));return changed;
     }
     /** With both corners set: the size and price line in chat, and the box of the selection drawn for this player. */
@@ -85,7 +96,7 @@ public final class SelectionToolListener implements Listener {
     public void teleport(UUID player,TeleportPoint point){
         Selection old=selections.get(player);if(old==null)throw new IllegalStateException("SELECTION_REQUIRED");
         if(!old.geometry().contains(point.world(),(int)Math.floor(point.x()),(int)Math.floor(point.y()),(int)Math.floor(point.z())))throw new IllegalStateException("TELEPORT_OUTSIDE_SELECTION");
-        selections.put(player,new Selection(old.first(),old.second(),old.ignoreHeight(),point));
+        selections.put(player,new Selection(old.first(),old.second(),old.ignoreHeight(),point,old.exactBounds()));
     }
     public void forget(UUID player,Selection expected){selections.remove(player,expected);}
 

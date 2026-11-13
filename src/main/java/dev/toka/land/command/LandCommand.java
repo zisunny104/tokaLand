@@ -26,18 +26,17 @@ public final class LandCommand extends Command {
         this.plugin=plugin;
         this.tools=new ClaimTools(plugin);
         this.help=new HelpPages("land",List.of(
-            new HelpPages.Section("basics","tokaland.use",false,List.of("menu","info","show","list","select","set","tpl","rename","del")),
+            new HelpPages.Section("basics","tokaland.use",false,List.of("menu","info","show","list","select","selectCoordinates","set","tpl","rename","del")),
             new HelpPages.Section("manage","tokaland.use",true,List.of("give","type","group","leave","tpaccess","note")),
             new HelpPages.Section("sub","tokaland.use",true,List.of("sub","leaseMenu","leaseOffer","leaseSet","leaseCancel","leaseRent","leaseRelease","leaseInfo","leaseList")),
             new HelpPages.Section("auction","tokaland.use",true,List.of("auctionMenu","auctionStart","auctionBid","auctionCancel","auctionList","auctionInfo")),
-            new HelpPages.Section("admin","tokaland.admin",true,List.of("grant","refund","reset","clear","deleted","restore","settle","reload","fac","facHelp")),
-            new HelpPages.Section("facility","tokaland.admin",true,List.of("facCreate","facList","facDel","facType","facMode","facLock")),
+            new HelpPages.Section("admin","tokaland.admin",true,List.of("grant","refund","reset","clear","deleted","restore","settle","reload")),
             new HelpPages.Section("inspect","tokaland.inspect",true,List.of("status","adminList","adminInfo"))),(sender,key,args)->plugin.texts().text(sender,key,args));
         setPermission("tokaland.use;tokaland.inspect");
         // Built aside and swapped in whole: the network thread encodes the command list at any moment, and a half-built map would leave enum references dangling.
         var rebuiltParams = new java.util.HashMap<String, cn.nukkit.command.data.CommandParameter[]>();
         // One line in the usage list: the word, then the rest as free text. The words that follow are described by /land help.
-        rebuiltParams.put("action",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandAction",new String[]{"help","menu","info","show","list","select","set","tpl","rename","del","give","type","group","leave","tpaccess","sub","lease","auction","fac","status","grant","refund","reset","clear","deleted","restore","settle","reload"})),
+        rebuiltParams.put("action",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandAction",new String[]{"help","menu","info","show","list","select","set","tpl","rename","del","give","type","group","leave","tpaccess","sub","lease","auction","status","grant","refund","reset","clear","deleted","restore","settle","reload"})),
             CommandParameter.newType("arguments",true,CommandParamType.RAWTEXT)});
         // The words used most get a line of their own so that their arguments are hinted; the rest are described by /land help.
         for(String word:List.of("menu","info","show"))rebuiltParams.put(word,new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLand"+word,new String[]{word}))});
@@ -45,6 +44,7 @@ public final class LandCommand extends Command {
         rebuiltParams.put("list",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandlist",new String[]{"list"})),CommandParameter.newType("page",true,CommandParamType.INT)});
         rebuiltParams.put("set",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandset",new String[]{"set"})),CommandParameter.newType("name",CommandParamType.STRING)});
         rebuiltParams.put("del",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLanddel",new String[]{"del"})),CommandParameter.newType("claim",true,CommandParamType.STRING)});
+        rebuiltParams.put("select-coordinates", SelectionCommand.parameters("TokaLand"));
         setCommandParameters(rebuiltParams);
     }
     /** The claims the player is a member of are offered after "leave"; the free-text overload stays for names the client cannot list. */
@@ -75,7 +75,7 @@ public final class LandCommand extends Command {
         if(action.equals("tpaccess"))return tpAccess(sender,args);
         if(action.equals("sub")||action.equals("lease"))return plugin.leases().command(sender,args);
         if(action.equals("auction"))return plugin.auctions().command(sender,args);
-        if(action.equals("fac")||action.equals("facility"))return facilityCommand(sender,args);
+
         if(Set.of("set","tpl","select","slt").contains(action))return purchaseCommand(sender,action,args);
         if(Set.of("deleted","restore","settle").contains(action))return adminTool(sender,action,args);
         if(sender instanceof Player self&&sender.hasPermission("tokaland.use")){
@@ -118,6 +118,9 @@ public final class LandCommand extends Command {
         if(!Main.ownsLand()){send(sender,"purchase.unavailable","LAND_NOT_ACTIVE");return true;}
         var tool=plugin.selectionTool();if(tool==null){send(sender,"purchase.unavailable","SELECTION_TOOL_DISABLED");return true;}
         try{
+            if ((action.equals("select") || action.equals("slt")) && args.length > 2) {
+                return SelectionCommand.execute(plugin, player, args, "select.coordinatesLand");
+            }
             if(action.equals("tpl")&&args.length==1){
                 var at=player.getLocation();tool.teleport(player.getUniqueId(),new dev.toka.land.model.ClaimDetails.TeleportPoint(at.getLevel().getFolderName(),at.x,at.y,at.z,(float)at.yaw,(float)at.pitch));
                 send(sender,"purchase.teleportSet");return true;
@@ -206,49 +209,6 @@ public final class LandCommand extends Command {
             return true;
         }catch(RuntimeException failure){send(player,"purchase.unavailable",failure.getMessage());return true;}
     }
-    private boolean facilityMaintenance(Player player,String[] args){
-        var facilities=plugin.facilities();
-        try{
-            switch(args[1].toLowerCase(Locale.ROOT)){
-                case "list" -> {
-                    var all=facilities.list();int page=1;
-                    if(args.length==3)page=Integer.parseInt(args[2]);
-                    int pages=all.isEmpty()?1:(all.size()-1)/10+1;
-                    if(page<1||page>pages){send(player,"command.invalidPage");return true;}
-                    send(player,"facility.listHeader",page,pages,all.size());
-                    for(int i=(page-1)*10;i<Math.min(page*10,all.size());i++)send(player,"facility.listRow",all.get(i).id(),all.get(i).name(),all.get(i).type(),all.get(i).accessPolicy().mode()+(all.get(i).accessPolicy().locked()?"+LOCK":""));
-                }
-                case "del" -> {
-                    if(args.length<3||args.length>4){send(player,"command.usage");return true;}
-                    var target=facilities.find(args[2]);
-                    // Deleting is permanent and unrefunded, so it needs an explicit confirm after naming the target.
-                    if(args.length==3){send(player,"facility.deleteConfirm",target.name(),target.id());return true;}
-                    if(!args[3].equalsIgnoreCase("confirm")){send(player,"command.usage");return true;}
-                    facilities.delete(player,target.id().toString()).whenComplete((r,e)->done(player,e,"facility.deleted",target.name()));
-                }
-                case "type" -> {
-                    if(args.length!=4){send(player,"command.usage");return true;}
-                    facilities.retype(player,args[2],args[3]).whenComplete((r,e)->done(player,e,"facility.retyped",args[2],args[3]));
-                }
-                case "mode" -> {
-                    if(args.length!=4){send(player,"command.usage");return true;}
-                    var mode=switch(args[3].toLowerCase(Locale.ROOT)){case "open"->AccessPolicy.Mode.OPEN;case "protect"->AccessPolicy.Mode.PROTECT;case "private"->AccessPolicy.Mode.PRIVATE;default->null;};
-                    if(mode==null){send(player,"command.usage");return true;}
-                    facilities.mode(player,args[2],mode).whenComplete((r,e)->done(player,e,"facility.moded",args[2],mode));
-                }
-                case "lock" -> {
-                    if(args.length<3||args.length>4){send(player,"command.usage");return true;}
-                    boolean on=args.length==3||args[3].equalsIgnoreCase("on");
-                    if(args.length==4&&!on&&!args[3].equalsIgnoreCase("off")){send(player,"command.usage");return true;}
-                    facilities.lock(player,args[2],on).whenComplete((r,e)->done(player,e,on?"facility.locked":"facility.unlocked",args[2]));
-                }
-                case "help" -> help.showTopic(player,"facility");
-                default -> send(player,"command.usage");
-            }
-        }catch(NumberFormatException invalid){send(player,"command.invalidPage");}
-        catch(IllegalArgumentException|IllegalStateException failure){send(player,"purchase.unavailable",failure.getMessage());}
-        return true;
-    }
     private static String rootMessage(Throwable error){
         Throwable root=error;while(root instanceof java.util.concurrent.CompletionException&&root.getCause()!=null)root=root.getCause();
         return root.getMessage()==null?root.getClass().getSimpleName():root.getMessage();
@@ -259,22 +219,6 @@ public final class LandCommand extends Command {
             else{Throwable root=error;while(root instanceof java.util.concurrent.CompletionException&&root.getCause()!=null)root=root.getCause();
                 send(player,"purchase.unavailable",root.getMessage()==null?root.getClass().getSimpleName():root.getMessage());}
         });
-    }
-    private boolean facilityCommand(CommandSender sender,String[] args){
-        if(!(sender instanceof Player player)||!sender.hasPermission("tokaland.admin")){send(sender,"command.denied");return true;}
-        if(args.length>=2&&dev.toka.land.model.FacilityTypes.SUBCOMMANDS.contains(args[1].toLowerCase(Locale.ROOT)))return facilityMaintenance(player,args);
-        if(args.length<2||args.length>3){send(sender,"command.usage");return true;}
-        try{
-            String type=args[1].toLowerCase(Locale.ROOT),name=args.length==3?args[2]:null;
-            plugin.facilities().save(player,type,name).whenComplete((status,error)->plugin.getServer().getScheduler().scheduleTask(plugin,()->{
-                if(error!=null)send(sender,"purchase.unavailable",error.getClass().getSimpleName());
-                else send(sender,status.equals("CREATED")?"facility.created":"facility.extended",name==null?type:name,type);
-            }));
-        }catch(IllegalArgumentException unknown){
-            if("UNKNOWN_FACILITY_TYPE".equals(unknown.getMessage()))send(sender,"facility.unknownType",String.join(", ",plugin.facilities().types().names()));
-            else send(sender,"purchase.unavailable",unknown.getMessage());
-        }catch(IllegalStateException failure){send(sender,"purchase.unavailable",failure.getMessage());}
-        return true;
     }
     /** Whether the query names a claim the player owns (or rents); only then "leave" is answered with the owner message. */
     private boolean owns(UUID player,String query){

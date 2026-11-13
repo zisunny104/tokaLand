@@ -41,7 +41,7 @@ public final class Facilities {
         if (draft == null || draft.first() == null || draft.second() == null || !draft.first().world().equals(draft.second().world()))
             throw new IllegalStateException("SELECTION_REQUIRED");
         String kind = type.toLowerCase(Locale.ROOT);
-        var part = types.select(kind, draft.first().world(), draft.first().x(), draft.first().y(), draft.first().z(),
+        var part = draft.exactBounds() ? draft.geometry() : types.select(kind, draft.first().world(), draft.first().x(), draft.first().y(), draft.first().z(),
                 draft.second().x(), draft.second().y(), draft.second().z());
         var existing = name == null ? null : plugin.allClaims().stream()
                 .filter(c -> c.kind() == ClaimKind.FACILITY && c.name().equalsIgnoreCase(name)).findFirst().orElse(null);
@@ -63,7 +63,7 @@ public final class Facilities {
             work = lands.create(claim);
             status = "CREATED";
         }
-        return work.thenApply(revision -> { tool.forget(player.getUniqueId()); return status; });
+        return work.thenApply(revision -> { tool.forget(player.getUniqueId(), draft); return status; });
     }
 
     /** Facilities by name, for paging. */
