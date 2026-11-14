@@ -8,7 +8,7 @@ public final class FacilityTypes {
     private static final Pattern NAME = Pattern.compile("[a-z][a-z0-9_-]{0,15}");
     private static final int MAX_REACH = 256;
     /** Subcommands of /fac. */
-    public static final Set<String> SUBCOMMANDS = Set.of("list", "del", "type", "mode", "lock", "help", "show", "info", "select");
+    public static final Set<String> SUBCOMMANDS = Set.of("list", "del", "type", "mode", "lock", "help", "show", "info", "select", "expand");
 
     public record Reach(int below, int above) {
         public Reach {

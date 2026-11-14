@@ -19,7 +19,7 @@ public final class FacilityCommand extends Command {
         this.plugin = plugin;
         setPermission("tokaland.admin");
         help = new HelpPages("fac", List.of(new HelpPages.Section("facility", "tokaland.admin", false,
-                List.of("facCreate", "facList", "facShow", "facInfo", "facSelect", "facDel", "facType", "facMode", "facLock"))),
+                List.of("facCreate", "facList", "facShow", "facInfo", "facSelect", "facExpand", "facDel", "facType", "facMode", "facLock"))),
                 (sender, key, args) -> plugin.texts().text(sender, key, args));
         Map<String, CommandParameter[]> parameters = new HashMap<>();
         Set<String> actions = new TreeSet<>(FacilityTypes.SUBCOMMANDS);
@@ -28,10 +28,14 @@ public final class FacilityCommand extends Command {
                 CommandParameter.newEnum("action", new CommandEnum("TokaFacAction", actions.toArray(String[]::new))),
                 CommandParameter.newType("arguments", true, CommandParamType.RAWTEXT)});
         parameters.put("select-coordinates", SelectionCommand.parameters("TokaFac"));
+        parameters.put("expand-coordinates", SelectionCommand.expandParameters("TokaFac"));
+        parameters.put("expand-default", SelectionCommand.expandParameters("TokaFac", false));
+        parameters.put("select-default", SelectionCommand.defaultSelectionParameters("TokaFac"));
         setCommandParameters(parameters);
     }
 
     @Override public boolean execute(CommandSender sender, String label, String[] args) {
+        if (args.length > 0 && args[0].equalsIgnoreCase("expand")) return SelectionCommand.expand(plugin, sender, args, ClaimKind.FACILITY);
         if (!(sender instanceof Player player) || !sender.hasPermission("tokaland.admin")) {
             send(sender, "command.denied");
             return true;
@@ -107,7 +111,8 @@ public final class FacilityCommand extends Command {
             return;
         }
         var claims = args.length == 2 ? List.of(plugin.facilities().find(args[1]))
-                : plugin.management().claimsAround(player).stream().filter(claim -> claim.kind() == ClaimKind.FACILITY).toList();
+                : plugin.findAllAt(player.getLevel().getFolderName(), player.getFloorX(), player.getFloorY(), player.getFloorZ())
+                        .stream().filter(claim -> claim.kind() == ClaimKind.FACILITY).toList();
         if (claims.isEmpty()) {
             send(player, "tools.noneHere");
             return;

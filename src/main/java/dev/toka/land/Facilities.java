@@ -84,14 +84,14 @@ public final class Facilities {
         return matches.stream().findFirst().orElseThrow(() -> new IllegalStateException("FACILITY_NOT_FOUND"));
     }
 
-    private void requireAdmin(Player player) {
+    private void requireAdmin(cn.nukkit.command.CommandSender player) {
         plugin.requirePrimaryThread();
         if (!Main.ownsLand() || plugin.maintenanceLocked()) throw new IllegalStateException("LAND_NOT_ACTIVE");
         if (!player.hasPermission("tokaland.admin")) throw new IllegalStateException("MANAGE_DENIED");
     }
 
     /** A locked facility can only be unlocked; every other change waits for that. */
-    private LandClaim editable(Player player, String idOrName) {
+    private LandClaim editable(cn.nukkit.command.CommandSender player, String idOrName) {
         requireAdmin(player);
         LandClaim claim = find(idOrName);
         if (claim.accessPolicy().locked()) throw new IllegalStateException("CLAIM_LOCKED");
@@ -100,6 +100,11 @@ public final class Facilities {
 
     public CompletableFuture<String> delete(Player player, String idOrName) {
         return lands.delete(editable(player, idOrName));
+    }
+
+    public CompletableFuture<String> expand(cn.nukkit.command.CommandSender player, String idOrName, LandSelection part) {
+        LandClaim claim = editable(player, idOrName);
+        return lands.edit(claim, ClaimEdits.addSelection(claim, part));
     }
 
     public CompletableFuture<String> retype(Player player, String idOrName, String type) {

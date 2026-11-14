@@ -30,13 +30,13 @@ public final class LandCommand extends Command {
             new HelpPages.Section("manage","tokaland.use",true,List.of("give","type","group","leave","tpaccess","note")),
             new HelpPages.Section("sub","tokaland.use",true,List.of("sub","leaseMenu","leaseOffer","leaseSet","leaseCancel","leaseRent","leaseRelease","leaseInfo","leaseList")),
             new HelpPages.Section("auction","tokaland.use",true,List.of("auctionMenu","auctionStart","auctionBid","auctionCancel","auctionList","auctionInfo")),
-            new HelpPages.Section("admin","tokaland.admin",true,List.of("grant","refund","reset","clear","deleted","restore","settle","reload")),
+            new HelpPages.Section("admin","tokaland.admin",true,List.of("grant","refund","reset","expand","clear","deleted","restore","settle","reload")),
             new HelpPages.Section("inspect","tokaland.inspect",true,List.of("status","adminList","adminInfo"))),(sender,key,args)->plugin.texts().text(sender,key,args));
         setPermission("tokaland.use;tokaland.inspect");
         // Built aside and swapped in whole: the network thread encodes the command list at any moment, and a half-built map would leave enum references dangling.
         var rebuiltParams = new java.util.HashMap<String, cn.nukkit.command.data.CommandParameter[]>();
         // One line in the usage list: the word, then the rest as free text. The words that follow are described by /land help.
-        rebuiltParams.put("action",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandAction",new String[]{"help","menu","info","show","list","select","set","tpl","rename","del","give","type","group","leave","tpaccess","sub","lease","auction","status","grant","refund","reset","clear","deleted","restore","settle","reload"})),
+        rebuiltParams.put("action",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandAction",new String[]{"help","menu","info","show","list","select","set","tpl","rename","del","give","type","group","leave","tpaccess","sub","lease","auction","status","grant","refund","reset","expand","clear","deleted","restore","settle","reload"})),
             CommandParameter.newType("arguments",true,CommandParamType.RAWTEXT)});
         // The words used most get a line of their own so that their arguments are hinted; the rest are described by /land help.
         for(String word:List.of("menu","info","show"))rebuiltParams.put(word,new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLand"+word,new String[]{word}))});
@@ -45,6 +45,9 @@ public final class LandCommand extends Command {
         rebuiltParams.put("set",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLandset",new String[]{"set"})),CommandParameter.newType("name",CommandParamType.STRING)});
         rebuiltParams.put("del",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLanddel",new String[]{"del"})),CommandParameter.newType("claim",true,CommandParamType.STRING)});
         rebuiltParams.put("select-coordinates", SelectionCommand.parameters("TokaLand"));
+        rebuiltParams.put("expand-coordinates", SelectionCommand.expandParameters("TokaLand"));
+        rebuiltParams.put("expand-default", SelectionCommand.expandParameters("TokaLand", false));
+        rebuiltParams.put("select-default", SelectionCommand.defaultSelectionParameters("TokaLand"));
         setCommandParameters(rebuiltParams);
     }
     /** The claims the player is a member of are offered after "leave"; the free-text overload stays for names the client cannot list. */
@@ -76,6 +79,7 @@ public final class LandCommand extends Command {
         if(action.equals("sub")||action.equals("lease"))return plugin.leases().command(sender,args);
         if(action.equals("auction"))return plugin.auctions().command(sender,args);
 
+        if(action.equals("expand"))return SelectionCommand.expand(plugin,sender,args,ClaimKind.PLAYER);
         if(Set.of("set","tpl","select","slt").contains(action))return purchaseCommand(sender,action,args);
         if(Set.of("deleted","restore","settle").contains(action))return adminTool(sender,action,args);
         if(sender instanceof Player self&&sender.hasPermission("tokaland.use")){

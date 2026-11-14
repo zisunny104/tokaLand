@@ -158,6 +158,15 @@ public final class Trading implements Listener, AutoCloseable {
         return sales.sell(claim, recipient, pricing.currency(), amount, amount > 0 ? source : null);
     }
 
+    /** Administrator-added selections do not add refundable value to legacy claims. */
+    LandClaim preserveRefundOnExpansion(LandClaim before, LandClaim expanded) {
+        if (before.details().refundValue() != null) return expanded;
+        UUID creator = before.details().creatorId();
+        long refund = creator != null && ClaimAccess.effectiveOwner(plugin.index(), before.id()).filter(creator::equals).isPresent()
+                ? pricing.refund(before.selections()) : 0L;
+        return dev.toka.land.model.ClaimEdits.refund(expanded, refund);
+    }
+
     public CompletableFuture<PurchaseCoordinator.Outcome> settle(UUID claimId, int percent) { return purchases.settle(claimId, percent); }
     public java.util.List<SaleCoordinator.Deleted> deleted() { return sales.deleted(); }
     public CompletableFuture<PurchaseCoordinator.Outcome> restore(UUID claimId) { return sales.restore(claimId); }

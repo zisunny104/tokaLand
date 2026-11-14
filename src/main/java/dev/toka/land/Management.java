@@ -59,6 +59,13 @@ public final class Management implements cn.nukkit.event.Listener {
         return lands.edit(before, after);
     }
 
+    public CompletableFuture<String> expand(cn.nukkit.command.CommandSender player, LandClaim claim, LandSelection part) {
+        requireAdmin(player);
+        if (trading.hasPending(claim.id())) throw new IllegalStateException("TRANSACTION_RECOVERY_PENDING");
+        if (claim.kind() != ClaimKind.PLAYER || claim.accessPolicy().locked()) throw new IllegalStateException("CLAIM_LOCKED");
+        return lands.edit(claim, trading.preserveRefundOnExpansion(claim, ClaimEdits.addSelection(claim, part)));
+    }
+
     /**
      * A member gives up their own place in a claim. This needs no right to manage, only a grant of the player's own on this claim;
      * the owner and a tenant cannot leave, and a right that comes from a parent claim is given up there.
@@ -113,7 +120,7 @@ public final class Management implements cn.nukkit.event.Listener {
         return draft.geometry();
     }
 
-    private void requireAdmin(Player player) {
+    private void requireAdmin(cn.nukkit.command.CommandSender player) {
         plugin.requirePrimaryThread();
         if (!Main.ownsLand() || plugin.maintenanceLocked()) throw new IllegalStateException("LAND_NOT_ACTIVE");
         if (!player.hasPermission("tokaland.admin")) throw new IllegalStateException("MANAGE_DENIED");
