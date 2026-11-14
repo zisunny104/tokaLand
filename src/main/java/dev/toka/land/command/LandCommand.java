@@ -46,8 +46,6 @@ public final class LandCommand extends Command {
         rebuiltParams.put("del",new CommandParameter[]{CommandParameter.newEnum("action",new CommandEnum("TokaLanddel",new String[]{"del"})),CommandParameter.newType("claim",true,CommandParamType.STRING)});
         rebuiltParams.put("select-coordinates", SelectionCommand.parameters("TokaLand"));
         rebuiltParams.put("expand-coordinates", SelectionCommand.expandParameters("TokaLand"));
-        rebuiltParams.put("expand-default", SelectionCommand.expandParameters("TokaLand", false));
-        rebuiltParams.put("select-default", SelectionCommand.defaultSelectionParameters("TokaLand"));
         setCommandParameters(rebuiltParams);
     }
     /** The claims the player is a member of are offered after "leave"; the free-text overload stays for names the client cannot list. */

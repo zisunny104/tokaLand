@@ -137,12 +137,12 @@ ui:
   denied: "§c[領地] 此操作未獲允許：${0}"
   unavailable: "§e[領地] 相關服務尚未就緒：${0}"
 help:
-  expand: "/land expand [2d|3d] <x1 y1 z1> <x2 y2 z2> [名稱或 ID] [世界] - 追加選區"
-  facExpand: "/fac expand [2d|3d] <x1 y1 z1> <x2 y2 z2> [名稱或 ID] [世界] - 追加選區"
+  expand: "/land expand <x1 y1 z1> <x2 y2 z2> [名稱或 ID] [世界] - 追加選區"
+  facExpand: "/fac expand <x1 y1 z1> <x2 y2 z2> [名稱或 ID] [世界] - 追加選區"
   facShow: "/fac show [名稱或 ID] - 顯示設施範圍"
   facInfo: "/fac info [名稱或 ID] - 查看設施資訊"
-  facSelect: "/fac select [2d|3d] <x1 y1 z1> <x2 y2 z2> - 設定選區"
-  selectCoordinates: "/land select [2d|3d] <x1 y1 z1> <x2 y2 z2> - 設定選區"
+  facSelect: "/fac select <x1 y1 z1> <x2 y2 z2> - 設定選區"
+  selectCoordinates: "/land select <x1 y1 z1> <x2 y2 z2> - 設定選區"
   section: "§6--- §f${0} 說明§r §7第 ${1}/${2} 頁 §6---"
   next: "§8下一頁：/${0} help ${1}"
   intro:
@@ -390,8 +390,8 @@ log:
   salesPending: "§c售地交易仍在保存，保留儲存鎖"
   purchasesPending: "§c購地交易仍在保存，保留儲存鎖"
 select:
-  coordinatesLand: "用法：/land select [2d|3d] <x1 y1 z1> <x2 y2 z2>"
-  coordinatesFac: "用法：/fac select [2d|3d] <x1 y1 z1> <x2 y2 z2>"
+  coordinatesLand: "用法：/land select <x1 y1 z1> <x2 y2 z2>"
+  coordinatesFac: "用法：/fac select <x1 y1 z1> <x2 y2 z2>"
   outsideHeight: "Y 座標須介於 ${0} 和 ${1}。"
   expanded: "已為「${0}」追加選區 ${1}。"
   wrongWorld: "新選區須位於領地所在的世界「${0}」。"

@@ -137,12 +137,12 @@ ui:
   denied: "§c[Land] This operation is not permitted: ${0}"
   unavailable: "§e[Land] A required service is unavailable: ${0}"
 help:
-  expand: "/land expand [2d|3d] <x1 y1 z1> <x2 y2 z2> [name or ID] [world] - Add a selection"
-  facExpand: "/fac expand [2d|3d] <x1 y1 z1> <x2 y2 z2> [name or ID] [world] - Add a selection"
+  expand: "/land expand <x1 y1 z1> <x2 y2 z2> [name or ID] [world] - Add a selection"
+  facExpand: "/fac expand <x1 y1 z1> <x2 y2 z2> [name or ID] [world] - Add a selection"
   facShow: "/fac show [name or ID] - Show facility bounds"
   facInfo: "/fac info [name or ID] - Inspect a facility"
-  facSelect: "/fac select [2d|3d] <x1 y1 z1> <x2 y2 z2> - Set selection"
-  selectCoordinates: "/land select [2d|3d] <x1 y1 z1> <x2 y2 z2> - Set selection"
+  facSelect: "/fac select <x1 y1 z1> <x2 y2 z2> - Set selection"
+  selectCoordinates: "/land select <x1 y1 z1> <x2 y2 z2> - Set selection"
   section: "§6--- §f${0} help§r §7page ${1}/${2} §6---"
   next: "§8Next page: /${0} help ${1}"
   intro:
@@ -385,8 +385,8 @@ log:
   salesPending: "§cSales are still saving, the store lock is kept"
   purchasesPending: "§cPurchases are still saving, the store lock is kept"
 select:
-  coordinatesLand: "Usage: /land select [2d|3d] <x1 y1 z1> <x2 y2 z2>"
-  coordinatesFac: "Usage: /fac select [2d|3d] <x1 y1 z1> <x2 y2 z2>"
+  coordinatesLand: "Usage: /land select <x1 y1 z1> <x2 y2 z2>"
+  coordinatesFac: "Usage: /fac select <x1 y1 z1> <x2 y2 z2>"
   outsideHeight: "Y coordinates must be between ${0} and ${1}."
   expanded: "Added selection ${1} to ${0}."
   wrongWorld: "The new selection must be in ${0}."

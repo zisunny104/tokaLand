@@ -29,8 +29,6 @@ public final class FacilityCommand extends Command {
                 CommandParameter.newType("arguments", true, CommandParamType.RAWTEXT)});
         parameters.put("select-coordinates", SelectionCommand.parameters("TokaFac"));
         parameters.put("expand-coordinates", SelectionCommand.expandParameters("TokaFac"));
-        parameters.put("expand-default", SelectionCommand.expandParameters("TokaFac", false));
-        parameters.put("select-default", SelectionCommand.defaultSelectionParameters("TokaFac"));
         setCommandParameters(parameters);
     }
 

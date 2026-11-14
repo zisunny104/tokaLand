@@ -56,15 +56,28 @@ public final class Trading implements Listener, AutoCloseable {
 
     /** Asks the region provider whether the point may be selected, and whether the area is priced flat. */
     public boolean ignoreHeight(Player player, SelectionToolListener.Point point) {
+        return selectionHeight(player, point).orElseGet(() -> plugin.getConfig().getBoolean("selection.default-ignore-height", false));
+    }
+
+    public boolean coordinateIgnoreHeight(Player player, SelectionToolListener.Point point) {
+        try {
+            return selectionHeight(player, point).orElse(false);
+        } catch (IllegalStateException unavailable) {
+            if ("PURCHASE_POLICY_UNAVAILABLE".equals(unavailable.getMessage())) return false;
+            throw unavailable;
+        }
+    }
+
+    private java.util.Optional<Boolean> selectionHeight(Player player, SelectionToolListener.Point point) {
         if (!Main.ownsLand() || plugin.maintenanceLocked()) throw new IllegalStateException("LAND_NOT_ACTIVE");
-        if (!player.hasPermission("tokaland.admin") && plugin.findAllAt(player.getLevel().getFolderName(), player.getFloorX(),
+        if (player != null && !player.hasPermission("tokaland.admin") && plugin.findAllAt(player.getLevel().getFolderName(), player.getFloorX(),
                 player.getFloorY(), player.getFloorZ()).stream().anyMatch(c -> c.kind() == ClaimKind.PLAYER))
             throw new IllegalStateException("SELECTION_INSIDE_LAND");
         JsonObject request = new JsonObject();
         request.addProperty("action", "SELECT");
         request.add("point", GSON.toJsonTree(point));
-        return ask(player, request).map(reply -> reply.get("ignoreHeight").getAsBoolean())
-                .orElse(plugin.getConfig().getBoolean("selection.default-ignore-height", false));
+        return ask(player, request).map(reply -> reply.get("ignoreHeight"))
+                .filter(value -> !value.isJsonNull()).map(com.google.gson.JsonElement::getAsBoolean);
     }
 
     /** The region provider's answer; an administrator is not held back by a region that is closed to purchases (public works go there). */
@@ -72,7 +85,7 @@ public final class Trading implements Listener, AutoCloseable {
         try {
             return plugin.providers().ask(player, request);
         } catch (IllegalStateException denied) {
-            if (player.hasPermission("tokaland.admin") && "PURCHASE_POLICY_DENIED".equals(denied.getMessage())) return java.util.Optional.empty();
+            if ((player == null || player.hasPermission("tokaland.admin")) && "PURCHASE_POLICY_DENIED".equals(denied.getMessage())) return java.util.Optional.empty();
             throw denied;
         }
     }
